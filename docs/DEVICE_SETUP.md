@@ -13,9 +13,8 @@ and drops activations older than one second. The camera service UUID is unchange
 
 ## IMU configuration
 
-The actual team sensor is still unconfirmed. An MPU-6050 driver is included and
-**disabled by default**; firmware prints this explicitly. In Imu.h set
-VERITY_ENABLE_MPU6050 to 1 only for that sensor. It checks WHO_AM_I, wakes the
+The team confirmed the MPU-6050. Its driver is enabled by default in Imu.h.
+Set VERITY_ENABLE_MPU6050 to 0 for camera-only diagnostics. It checks WHO_AM_I, wakes the
 chip, uses +/-2g and +/-250deg/s ranges, and calibrates a neutral posture from
 100 still samples. Then it detects a deliberate pitch-down and return gesture.
 Default threshold 18 degrees, return within 6 degrees, 180–1500ms duration,

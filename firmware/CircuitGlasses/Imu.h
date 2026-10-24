@@ -3,7 +3,7 @@
 
 // Enable only after confirming your sensor and the available pins. No SD card use.
 #ifndef VERITY_ENABLE_MPU6050
-#define VERITY_ENABLE_MPU6050 0
+#define VERITY_ENABLE_MPU6050 1
 #endif
 #ifndef VERITY_IMU_SDA
 #define VERITY_IMU_SDA 13
@@ -54,11 +54,11 @@ static bool poll() {
   if (!ready || uint32_t(now-last) < 20) return false;
   last = now;
   uint8_t raw[14];
-  if (!read(0x3b, raw, sizeof(raw))) { calibrated=0; return false; }
+  if (!read(0x3b, raw, sizeof(raw))) { calibrated=0; neutral=0; return false; }
   float ax=signed16(raw)/16384.0f, ay=signed16(raw+2)/16384.0f, az=signed16(raw+4)/16384.0f;
   float gx=signed16(raw+8)/131.0f, gy=signed16(raw+10)/131.0f, gz=signed16(raw+12)/131.0f;
   float gravity = sqrtf(ax*ax+ay*ay+az*az);
-  if (gravity < 0.75f || gravity > 1.25f) return false;
+  if (gravity < 0.75f || gravity > 1.25f) { if (calibrated < 100) { calibrated=0; neutral=0; } return false; }
   float pitch = atan2f(-ax, sqrtf(ay*ay+az*az))*57.29578f*VERITY_PITCH_DIRECTION;
   if (calibrated < 100) {
     if (fabsf(gx)+fabsf(gy)+fabsf(gz) > 15) { calibrated=0; neutral=0; return false; }
