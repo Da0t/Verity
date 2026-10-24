@@ -13,6 +13,7 @@ class SystemSynthesizer:
             if sys.platform == 'win32':
                 script = '''
 $ErrorActionPreference = 'Stop'
+[Console]::InputEncoding = [System.Text.Encoding]::UTF8
 Add-Type -AssemblyName System.Speech
 $p = [Console]::In.ReadToEnd() | ConvertFrom-Json
 $s = New-Object System.Speech.Synthesis.SpeechSynthesizer

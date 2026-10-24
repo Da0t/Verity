@@ -1,1 +1,4 @@
-bleak>=1.0,<4
+-r requirements/device.txt
+-r requirements/voice.txt
+-r requirements/agents.txt
+-r requirements/app.txt

@@ -1,0 +1,10 @@
+{
+  "recipe_id": "template",
+  "template": true,
+  "title": "Generic assembly template — replace with your actual circuit",
+  "steps": [
+    {"id": "identify", "instruction": "Identify the exact controller and connector using their labels.", "expected": "Controller and connector labels are visible and match the build instructions."},
+    {"id": "connect", "instruction": "With power disconnected, seat the identified connector in the matching socket specified by your build instructions.", "expected": "The specified connector is visibly seated in its matching labeled socket."},
+    {"id": "inspect", "instruction": "Inspect the completed connection against the reference before the separate electrical test.", "expected": "The visible assembly matches the verified reference without an unplugged connector."}
+  ]
+}
