@@ -13,13 +13,14 @@ Implement these files as namespace-package modules under `verity/`. No shared
 ```python
 class Device:
     async def connect(self) -> None: ...
-    async def wait_for_nod(self) -> None: ...
+    async def wait_for_gesture(self) -> str: ...  # "speak" | "back" | "next"
     async def capture_jpeg(self, timeout: float = 30.0) -> bytes: ...
     async def close(self) -> None: ...
 ```
 
-Constructor takes configuration, never connects implicitly. `wait_for_nod()`
-returns once per deliberate activation event. Use an asyncio queue; coalesce or
+Constructor takes configuration, never connects implicitly. `wait_for_gesture()`
+returns once per deliberate head gesture: "speak" (double nod), "back" (double
+left turn) or "next" (double right turn). Use an asyncio queue; coalesce or
 discard stale activations rather than replaying them after a long model request.
 Capture returns verified fresh JPEG bytes or raises an exception. A disconnect
 is an explicit failure, never a cached image. Existing receiver.py is the starting
@@ -99,10 +100,12 @@ python -m verity.app --mock --recipe recipes/demo.json
 ```
 
 Normal flow: IDLE → LISTENING → THINKING (optional CAPTURING) → SPEAKING → IDLE.
-One long-lived nod consumer: in IDLE it starts listening; in SPEAKING it cancels
-playback then starts listening; in THINKING it cancels the current turn then
-starts listening. Ignore/coalesce nods during LISTENING. Apply gesture cooldown.
-Thus a user can nod, say “stop,” and cancel without a keyboard. No always-on
+One long-lived gesture consumer. A double nod: in IDLE it starts listening; in
+SPEAKING it cancels playback then starts listening; in THINKING it cancels the
+current turn then starts listening. Ignore/coalesce double nods during LISTENING.
+A double left/right turn cancels any turn (including LISTENING) and reads the
+previous/next step without listening. Apply gesture cooldown.
+Thus a user can double nod, say “stop,” and cancel without a keyboard. No always-on
 spoken interruption is promised by v1.
 
 Handle repeat/stop locally before the model where possible. A user-requested

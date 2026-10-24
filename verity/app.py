@@ -32,7 +32,7 @@ async def run(args):
     if args.mock:
         from verity.mocks import MockDevice,MockVoice,MockCoach
         device=MockDevice(); voice=MockVoice(); coach=MockCoach()
-        print('MOCK MODE: simulated nods, microphone, camera, model and playback.')
+        print('MOCK MODE: simulated gestures, microphone, camera, model and playback.')
     else:
         from verity.device import Device
         from verity.voice import Voice
@@ -53,7 +53,7 @@ async def run(args):
                 for question in scenario:
                     await controller.idle.wait()
                     controller.turn_started.clear()
-                    voice.questions.put_nowait(question); device.nod()
+                    voice.questions.put_nowait(question); device.gesture()
                     await controller.turn_started.wait()
                     await controller.idle.wait()
             finally: controller.stop.set()

@@ -7,7 +7,7 @@ class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
 
-Intent = Literal["check", "question", "next", "repeat", "stop", "unknown"]
+Intent = Literal["check", "question", "next", "back", "repeat", "stop", "unknown"]
 Verdict = Literal["pass", "issue", "unclear", "not_checked"]
 
 

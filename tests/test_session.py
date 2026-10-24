@@ -34,6 +34,32 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(voice.spoken[-1],'Second instruction.')
         self.assertEqual(device.captures,0)
 
+    async def test_gesture_navigation_skips_listening(self):
+        controller,_,voice=await self.make()
+        for kind,index,spoken in [('back',0,'You are on the first step.'),('next',1,'Second instruction.'),
+                                  ('next',1,'You are on the last step.'),('back',0,'First instruction.')]:
+            await controller.activate(kind); await asyncio.wait_for(controller.idle.wait(),1)
+            self.assertEqual((controller.data['step_index'],voice.spoken[-1]),(index,spoken))
+        self.assertTrue(voice.questions.empty())
+        await self.turn(controller,voice,'repeat')
+        self.assertEqual(voice.spoken[-1],'First instruction.')
+
+    async def test_gesture_interrupts_listening(self):
+        controller,_,voice=await self.make()
+        await controller.activate(); await asyncio.sleep(0)
+        self.assertEqual(controller.state,'LISTENING')
+        await controller.activate('next'); await asyncio.wait_for(controller.idle.wait(),1)
+        self.assertEqual((controller.data['step_index'],voice.spoken),(1,['Second instruction.']))
+
+    async def test_gesture_loop_routes_kinds(self):
+        controller,device,voice=await self.make()
+        task=asyncio.create_task(controller.run())
+        device.gesture('next')
+        await asyncio.wait_for(controller.turn_started.wait(),1)
+        await controller.idle.wait()
+        controller.stop.set(); await task
+        self.assertEqual((controller.data['step_index'],voice.spoken),(1,['Second instruction.']))
+
     async def test_check_invokes_capture(self):
         controller,device,voice=await self.make()
         await self.turn(controller,voice,'check this')
@@ -125,7 +151,7 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         async def close(): closed.append(True)
         device.close=close; voice.close=close; controller.coach.close=close
         task=asyncio.create_task(controller.run())
-        voice.questions.put_nowait('stop'); device.nod()
+        voice.questions.put_nowait('stop'); device.gesture()
         await asyncio.wait_for(controller.turn_started.wait(),1)
         await controller.idle.wait()
         controller.stop.set(); await task

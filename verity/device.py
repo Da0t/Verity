@@ -1,4 +1,4 @@
-"""Windows-side Device adapter: verified JPEG snapshots and IMU nod events over BLE.
+"""Windows-side Device adapter: verified JPEG snapshots and IMU head gestures over BLE.
 
 Smoke test: python -m verity.device --count 10
 """
@@ -10,12 +10,15 @@ import time
 import receiver
 from receiver import NOD, SERVICE
 
+# Gesture byte of the 5-byte nod notification (firmware Verity::Gesture).
+GESTURES = {1: "speak", 2: "back", 3: "next"}
+
 
 class Device:
     def __init__(self, address=None, scan_timeout=15.0, nods=True, nod_max_age=1.5):
         """address: optional BLE address; otherwise the first camera advertising SERVICE.
-        nods: require and subscribe to the firmware nod characteristic.
-        nod_max_age: seconds after which an unconsumed nod is stale and discarded.
+        nods: require and subscribe to the firmware nod (gesture) characteristic.
+        nod_max_age: seconds after which an unconsumed gesture is stale and discarded.
         """
         self.address = address
         self.scan_timeout = scan_timeout
@@ -25,7 +28,7 @@ class Device:
         self._closed = False
         self._last_sequence = None
         self._last_nod = 0.0
-        self._queue = asyncio.Queue()  # receipt time of a nod, or None on disconnect
+        self._queue = asyncio.Queue()  # (receipt time, gesture) of a gesture, or None on disconnect
         self._connect_lock = asyncio.Lock()
         self._capture_lock = asyncio.Lock()
 
@@ -61,7 +64,13 @@ class Device:
             self._last_sequence = None
 
     def _on_nod(self, _sender, data):
-        if len(data) not in (4, 8):
+        if len(data) == 5:
+            gesture = GESTURES.get(data[4])
+        elif len(data) in (4, 8):
+            gesture = "speak"  # pre-gesture firmware: every nod means speak
+        else:
+            return
+        if gesture is None:
             return
         sequence = struct.unpack_from('<I', data)[0]
         if sequence == self._last_sequence:
@@ -71,21 +80,22 @@ class Device:
         # Coalesce: only the newest activation matters.
         while not self._queue.empty():
             self._queue.get_nowait()
-        self._queue.put_nowait(time.monotonic())
+        self._queue.put_nowait((time.monotonic(), gesture))
 
     def _on_disconnect(self, client):
         if client is self._client:
             self._queue.put_nowait(None)
 
-    async def wait_for_nod(self):
-        """Return once per fresh deliberate nod. Reconnects after a disconnect."""
+    async def wait_for_gesture(self):
+        """Return 'speak', 'back' or 'next' once per fresh deliberate gesture.
+        Reconnects after a disconnect."""
         while True:
             if self._closed:
                 raise ConnectionError("Device closed")
             await self.connect()
             received = await self._queue.get()
-            if received is not None and time.monotonic() - received <= self.nod_max_age:
-                return
+            if received is not None and time.monotonic() - received[0] <= self.nod_max_age:
+                return received[1]
 
     async def capture_jpeg(self, timeout=30.0):
         """Return fresh verified JPEG bytes or raise. Never returns a cached image."""
@@ -98,7 +108,7 @@ class Device:
     async def close(self):
         self._closed = True
         client, self._client = self._client, None
-        self._queue.put_nowait(None)  # release a pending wait_for_nod
+        self._queue.put_nowait(None)  # release a pending wait_for_gesture
         if client is not None:
             await client.disconnect()
 
@@ -106,12 +116,13 @@ class Device:
 async def main(args):
     device = Device(args.address, nods=not args.no_nods)
     await device.connect()
-    print("Connected." + ("" if args.no_nods else " Nod to capture."))
+    print("Connected." + ("" if args.no_nods else " Double nod to capture."))
     try:
         for i in range(1, args.count + 1):
             if not args.no_nods:
-                await device.wait_for_nod()
-                print("Nod received")
+                while await device.wait_for_gesture() != "speak":
+                    pass
+                print("Double nod received")
             start = time.monotonic()
             try:
                 jpeg = await device.capture_jpeg(args.timeout)

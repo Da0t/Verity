@@ -4,6 +4,12 @@
 #include <iostream>
 using namespace Verity;
 constexpr uint8_t still=SensorOk|Calibrated|Settled;
+// Gesture traces at 100 Hz; every completed double is appended as one decimal digit.
+static unsigned fired=0;
+static void hold(GestureDetector& d,uint32_t& t,float pitch,float yaw,uint32_t ms) {
+  for(uint32_t end=t+ms;t<end;t+=10) if(uint8_t g=d.update(pitch,yaw,t)) fired=fired*10+g;
+}
+static void move(GestureDetector& d,uint32_t& t,float pitch,float yaw) { hold(d,t,pitch,yaw,250); hold(d,t,0,0,150); }
 struct Fixture {
   SenderLink sender{11,100}; CameraLink camera{22,200}; uint32_t now=100;
   Packet take(uint8_t flags=still) { Packet p; assert(sender.poll(now,flags,p)); assert(valid(p)); return p; }
@@ -23,14 +29,34 @@ int main() {
   // Known byte layout, strict parsing and malformed payloads.
   Packet p; p.boot=0x12345678; p.token=9;p.seq=1;
   uint8_t bytes[PACKET_SIZE]; assert(encode(p,bytes,sizeof(bytes)));
-  assert(bytes[0]=='V' && bytes[2]==1 && bytes[4]==0x78 && bytes[7]==0x12);
+  assert(bytes[0]=='V' && bytes[2]==2 && bytes[4]==0x78 && bytes[7]==0x12);
   Packet out; assert(decode(bytes,sizeof(bytes),out)); assert(out.boot==p.boot);
   for(size_t size=0;size<PACKET_SIZE;++size) assert(!decode(bytes,size,out));
-  assert(!decode(nullptr,28,out)); assert(!encode(p,nullptr,28));
-  for(int offset: {0,1,2,3,26,27}) { auto old=bytes[offset]; bytes[offset]=255; assert(!decode(bytes,28,out)); bytes[offset]=old; }
+  assert(!decode(nullptr,PACKET_SIZE,out)); assert(!encode(p,nullptr,PACKET_SIZE));
+  for(int offset: {0,1,2,3,26,27,28}) { auto old=bytes[offset]; bytes[offset]=255; assert(!decode(bytes,PACKET_SIZE,out)); bytes[offset]=old; }
   assert(!motionValid(Settled)); assert(!motionValid(128));
   assert(newer(1,0xffffffffu)); assert(!newer(5,5)); assert(!newer(4,5));
   assert(elapsed(4,0xfffffffeu)==6);
+  // Only Nod packets carry a gesture, and only a known one.
+  { Packet q=p; q.gesture=DoubleNod; assert(!valid(q)); }
+  // The gesture kind survives sender -> wire -> camera.
+  { Fixture f; f.handshake(); assert(f.sender.nod(f.now,still,DoubleRight)); auto nod=f.take();
+    assert(nod.gesture==DoubleRight); uint8_t wire[PACKET_SIZE]; Packet back;
+    assert(encode(nod,wire,PACKET_SIZE) && decode(wire,PACKET_SIZE,back) && back.gesture==DoubleRight);
+    for(uint8_t bad: {uint8_t(NoGesture),uint8_t(4)}) { back.gesture=bad; assert(!valid(back)); }
+    assert(f.deliver(nod).nod);
+  }
+  // Double gestures: singles, mixed pairs and slow pairs do nothing; a third repeat is swallowed.
+  { GestureDetector d; uint32_t t=0; hold(d,t,0,0,1000);
+    move(d,t,25,0); hold(d,t,0,0,2000); assert(fired==0);
+    move(d,t,25,0); move(d,t,25,0); hold(d,t,0,0,2000); assert(fired==DoubleNod);
+    fired=0; move(d,t,0,35); move(d,t,0,35); hold(d,t,0,0,2000); assert(fired==DoubleLeft);
+    fired=0; move(d,t,0,-35); move(d,t,0,-35); hold(d,t,0,0,2000); assert(fired==DoubleRight);
+    fired=0; move(d,t,0,35); move(d,t,0,-35); hold(d,t,0,0,2000); assert(fired==0);
+    move(d,t,25,0); hold(d,t,0,0,1000); move(d,t,25,0); hold(d,t,0,0,2000); assert(fired==0);
+    move(d,t,25,0); move(d,t,25,0); move(d,t,25,0); hold(d,t,0,0,2000); assert(fired==DoubleNod);
+    fired=0; move(d,t,10,10); move(d,t,10,10); hold(d,t,0,0,2000); assert(fired==0); // too small
+  }
   // No gestures queued before a fresh handshake.
   { Fixture f; assert(!f.sender.nod(f.now,still)); f.handshake(); auto status=f.take(); assert(status.type==Type::Status); }
   // Application ACK loss causes a retry, never a second activation.

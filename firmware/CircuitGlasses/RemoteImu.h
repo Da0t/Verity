@@ -11,7 +11,7 @@ static bool begin() {
   return radio.begin(VERITY_SENSOR_MAC,VERITY_ESPNOW_CHANNEL);
 }
 static bool settled() { return link && link->settled(millis()); }
-static bool poll() {
+static uint8_t poll() {
   if (!link) return false;
   if (epoch!=BleCamera::epoch()) { epoch=BleCamera::epoch(); link->invalidate(); }
   Verity::Received received;
@@ -19,8 +19,8 @@ static bool poll() {
     if (epoch!=BleCamera::epoch()) { epoch=BleCamera::epoch(); link->invalidate(); }
     auto action=link->receive(received.packet,received.at,millis(),BleCamera::canNotifyNod());
     if(action.nod) {
-      if (!BleCamera::notifyNod(epoch)) action.packet.code=Verity::Ack::Dropped;
-      else Serial.println("Remote nod forwarded to BLE");
+      if (!BleCamera::notifyNod(received.packet.gesture,epoch)) action.packet.code=Verity::Ack::Dropped;
+      else Serial.println("Remote gesture forwarded to BLE");
     }
     if(action.reply) radio.send(action.packet);
   }
@@ -29,6 +29,6 @@ static bool poll() {
   if(Verity::elapsed(millis(),logged)>=5000) {
     logged=millis(); Serial.printf("%s; BLE nod subscriber=%d queueDrops=%lu txBusy=%d txErrors=%lu\n",link->reason(logged),BleCamera::canNotifyNod(),(unsigned long)radio.queueDrops(),radio.busy(),(unsigned long)radio.sendErrors());
   }
-  return false; // Notification already handled once above, in the main loop.
+  return 0; // Notification already handled once above, in the main loop.
 }
 }

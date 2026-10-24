@@ -1,6 +1,6 @@
 # Verity
 
-Hands-free electronics assembly guidance: nod to activate, ask a question or
+Hands-free electronics assembly guidance: double nod to activate, ask a question or
 request a visual check, and hear a short response through a headset.
 
 All four software components are implemented and integrated on **`main`**: device/IMU, voice, build agents and controller.
@@ -47,7 +47,7 @@ Enter the Gemini key at the hidden terminal prompt. Successful setup writes loca
 `.env.agents`, ignored by Git. Each machine needs its own configuration; credentials
 are not included in the repository. This is a private repository requiring access.
 
-Mock mode runs a scripted six-turn scenario and exits. It uses simulated nod,
+Mock mode runs a scripted six-turn scenario and exits. It uses simulated gesture,
 audio, camera and model behavior, and labels all outputs as simulated. It requires
 no BLE hardware, microphone or API key after dependencies are installed.
 
@@ -97,13 +97,15 @@ in [AGENTS_SETUP.md](docs/AGENTS_SETUP.md).
 
 ## Hands-free behavior
 
-* Nod down and return → listening tone → ask one question.
+* Double nod (down and back, twice) → listening tone → ask one question.
+* Double right head turn → next step; double left → previous step. Both read the
+  step aloud without listening. A single nod or turn does nothing.
 * “Check this” requests a fresh photo and a pass / issue / unclear observation.
-* “What is the next step?” reads the current instruction. “Next” manually advances;
-  it does not claim the prior step was verified.
+* “What is the next step?” reads the current instruction. “Next” / “back” manually
+  move steps; they do not claim the prior step was verified.
 * “Repeat” replays the previous answer without a model request.
-* Nod during speech or processing to interrupt and reopen listening. Nods while
-  recording are ignored. Say “stop” after activation to cancel that request.
+* Double nod during speech or processing to interrupt and reopen listening. Double
+  nods while recording are ignored. Say “stop” after activation to cancel that request.
 * “End session” exits. Ctrl+C is available to the demo operator.
 
 The controller serializes turns and drops cancelled results. Calls have deadlines;

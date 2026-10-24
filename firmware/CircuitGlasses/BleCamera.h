@@ -1,7 +1,7 @@
 #pragma once
 // Arduino-ESP32 + NimBLE-Arduino 2.x. Call begin() AFTER esp_camera_init().
 // Camera must produce JPEG. Call poll() frequently from Arduino loop().
-// Optional IMU: call notifyNod() per detected nod; pass poll(settled) so a
+// Optional IMU: call notifyNod(gesture) per detected head gesture; pass poll(settled) so a
 // capture waits (bounded) for head motion to stop.
 #include <Arduino.h>
 #include <atomic>
@@ -114,19 +114,20 @@ static void begin() {
   ad->addServiceUUID(SERVICE); ad->setName("CircuitGlasses");
   ad->enableScanResponse(true); ad->start();
 }
-// Notify subscribers of one nod: payload is seq:u32 little-endian.
-static bool notifyNod(uint32_t expectedEpoch) {
+// Notify subscribers of one head gesture: payload is seq:u32 little-endian,
+// then gesture:u8 (Verity::Gesture: 1=double nod, 2=double left, 3=double right).
+static bool notifyNod(uint8_t gesture, uint32_t expectedEpoch) {
   xSemaphoreTake(nodMutex, portMAX_DELAY);
   bool sent=false;
   if (canNotifyNod() && epoch()==expectedEpoch) {
-    uint8_t b[4]; put32(b, ++nodSeq);
+    uint8_t b[5]; put32(b, ++nodSeq); b[4]=gesture;
     nodChar->setValue(b, sizeof(b));
     sent=nodChar->notify(b, sizeof(b), nodConnection);
   }
   xSemaphoreGive(nodMutex);
   return sent;
 }
-static bool notifyNod() { return notifyNod(epoch()); }
+static bool notifyNod(uint8_t gesture) { return notifyNod(gesture, epoch()); }
 static void poll(bool settled = true) {
   xSemaphoreTake(mutex, portMAX_DELAY);
   // Wait for the head to settle so the photo is not motion-blurred, but not forever.

@@ -70,8 +70,14 @@ not contain Wi-Fi credentials; do not add `WiFi.begin()` or an access point.
    for `IMU calibrated`. Enable `VERITY_IMU_DEBUG=1` to see pitch and flags. Pitch
    must increase on a downward nod: change `VERITY_PITCH_DIRECTION` from 1 to -1
    if reversed. `VERITY_PITCH_AXIS` selects the accelerometer component (0=X,
-   1=Y, 2=Z); mounting orientation must match. Default gesture: down >15 degrees,
-   return within 6 degrees in 80–900 ms, with 1500 ms cooldown.
+   1=Y, 2=Z); mounting orientation must match. A nod is down >15 degrees and
+   back within 6 degrees in 80–900 ms; a turn is >25 degrees and back within 10
+   in 80–1000 ms. Commands are doubles: the same gesture twice within 900 ms
+   (double nod = speak, double left = back, double right = next). The debug line
+   also prints yaw: it must increase when turning the head LEFT; change
+   `VERITY_YAW_DIRECTION` from 1 to -1 if reversed. Thresholds live in
+   `Verity/GestureDetector.h`. Sensor and camera must be flashed together
+   (ESP-NOW protocol version 2).
 2. **ESP-NOW only:** power both boards; verify sensor `senderLink=1`, camera fresh
    motion diagnostics, and local nod messages. Without a BLE subscriber, camera
    consumes and drops nods deliberately. Those gestures will never play later.

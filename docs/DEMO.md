@@ -22,12 +22,13 @@ is `python -m verity.app`; component contracts remain in docs/CONTRACTS.md.
 ## Hardware checks still required
 
 1. Flash for the actual ESP32-CAM board (the software build is verified), then verify MPU-6050 identity,
-   neutral calibration and nod direction. Confirm no SD/pin conflict.
+   neutral calibration, nod direction and turn (yaw) direction. Confirm no SD/pin conflict.
 2. Capture ten actual JPEGs at the working distance; measure transfer latency and
    whether the intended connection is visible. Ensure disconnect causes a clear
    error rather than reusing a cached frame. The adapter attempts a fresh connection; restart the app if discovery fails.
 3. Use the Windows headset `--audio-check`. Tune VAD, verify noise handling and
-   interrupt a long spoken answer with a deliberate nod.
+   interrupt a long spoken answer with a deliberate double nod. Double left/right
+   must move back/forward one step.
 4. Replace the generic template with the actual three-to-five-step circuit,
    manufacturer documentation and correct reference photos.
 5. Perform three consecutive runs: instruction → visible mistake → check → useful

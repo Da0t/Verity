@@ -1,4 +1,4 @@
-"""One-turn-at-a-time session controller for nod, voice, camera and coach."""
+"""One-turn-at-a-time session controller for head gestures, voice, camera and coach."""
 import asyncio
 import copy
 import logging
@@ -35,32 +35,33 @@ class Session:
         self.task=None
         await self.voice.stop_speaking()
 
-    async def activate(self):
+    async def activate(self, question=None):
+        """Start a turn. question=None listens (double nod); 'next'/'back' navigate without listening."""
         now=time.monotonic()
-        if self.state=='LISTENING' or now-self.last_activation < self.cooldown: return
+        if (question is None and self.state=='LISTENING') or now-self.last_activation < self.cooldown: return
         self.last_activation=now
         await self._cancel()
         self.idle.clear(); self.turn_started.set()
-        self.task=asyncio.create_task(self._turn(self.turn_id))
+        self.task=asyncio.create_task(self._turn(self.turn_id,question))
 
     async def run(self):
-        nod=stopper=None
+        gesture=stopper=None
         try:
             async with asyncio.timeout(15): await self.voice.start()
             async with asyncio.timeout(30): await self.device.connect()
-            log.info('ready: nod to activate')
+            log.info('ready: double nod to speak, double left/right for previous/next step')
             stopper=asyncio.create_task(self.stop.wait())
-            nod=asyncio.create_task(self.device.wait_for_nod())
+            gesture=asyncio.create_task(self.device.wait_for_gesture())
             while not self.stop.is_set():
-                done,_=await asyncio.wait([nod,stopper],return_when=asyncio.FIRST_COMPLETED)
+                done,_=await asyncio.wait([gesture,stopper],return_when=asyncio.FIRST_COMPLETED)
                 if stopper in done: break
-                await nod  # propagate disconnection, never spin on a failed waiter
-                await self.activate()
-                nod=asyncio.create_task(self.device.wait_for_nod())
+                kind=await gesture  # propagate disconnection, never spin on a failed waiter
+                await self.activate(None if kind=='speak' else kind)
+                gesture=asyncio.create_task(self.device.wait_for_gesture())
         finally:
-            for task in (nod,stopper):
+            for task in (gesture,stopper):
                 if task: task.cancel()
-            await asyncio.gather(*(t for t in (nod,stopper) if t),return_exceptions=True)
+            await asyncio.gather(*(t for t in (gesture,stopper) if t),return_exceptions=True)
             try: await self._cancel()
             finally:
                 # Close every resource even if another cleanup fails.
@@ -85,9 +86,15 @@ class Session:
             output=result(self.data['steps'][index]['instruction'][:600],intent='next')
             output['suggested_step_index']=index
             return output
+        if normalized in ('back','go back','previous','previous step'):
+            index=self.data['step_index']-1
+            if index < 0: return result('You are on the first step.',intent='back')
+            output=result(self.data['steps'][index]['instruction'][:600],intent='back')
+            output['suggested_step_index']=index
+            return output
         return None
 
-    async def _turn(self, serial):
+    async def _turn(self, serial, question=None):
         captured=False
         async def capture():
             nonlocal captured
@@ -102,9 +109,10 @@ class Session:
                 if serial==self.turn_id: self.transition('THINKING')
         try:
             async with asyncio.timeout(self.turn_timeout):
-                self.transition('LISTENING')
-                await self.voice.cue('listening')
-                question=(await self.voice.listen(timeout=10)).strip()
+                if question is None:
+                    self.transition('LISTENING')
+                    await self.voice.cue('listening')
+                    question=(await self.voice.listen(timeout=10)).strip()
                 if not question: return
                 if serial != self.turn_id: return
                 output=self.local(question)
@@ -116,8 +124,9 @@ class Session:
                 if serial != self.turn_id: return
                 validated=Result.model_validate(output).model_dump()
                 next_index=validated['suggested_step_index']
-                if next_index is not None and (validated['intent']!='next' or
-                        not (next_index == self.data['step_index']+1 and next_index < len(self.data['steps']))):
+                step={'next':1,'back':-1}.get(validated['intent'])
+                if next_index is not None and (step is None or
+                        not (next_index == self.data['step_index']+step and 0 <= next_index < len(self.data['steps']))):
                     raise ValueError('Invalid step change')
                 if validated['verdict'] in ('pass','issue') and not captured:
                     raise ValueError('Visual result without capture')
@@ -138,7 +147,7 @@ class Session:
                 try:
                     async with asyncio.timeout(10):
                         await self.voice.cue('error')
-                        await self.voice.speak('I could not complete that request. Please nod and try again.')
+                        await self.voice.speak('I could not complete that request. Please double nod and try again.')
                 except Exception: log.error('Could not play error feedback')
         finally:
             if serial==self.turn_id:

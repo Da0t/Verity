@@ -15,14 +15,14 @@ void setup() {
   radio.begin(VERITY_CAMERA_MAC,VERITY_ESPNOW_CHANNEL);
   Verity::MotionConfig config;
   config.sda=VERITY_IMU_SDA; config.scl=VERITY_IMU_SCL; config.address=VERITY_IMU_ADDRESS;
-  config.axis=VERITY_PITCH_AXIS; config.direction=VERITY_PITCH_DIRECTION; config.debug=VERITY_IMU_DEBUG;
+  config.axis=VERITY_PITCH_AXIS; config.direction=VERITY_PITCH_DIRECTION; config.yawDirection=VERITY_YAW_DIRECTION; config.debug=VERITY_IMU_DEBUG;
   motion.begin(config);
 }
 void loop() {
   Verity::Received received;
   while(radio.receive(received)) senderLink->receive(received.packet,received.at,millis());
   uint32_t now=millis();
-  if(motion.poll(now)) { senderLink->nod(now,motion.flags(now)); Serial.println("Local nod"); }
+  if(uint8_t gesture=motion.poll(now)) { senderLink->nod(now,motion.flags(now),gesture); Serial.printf("Local gesture %u\n",gesture); }
   Verity::Packet packet;
   if(radio.ready() && senderLink->poll(now,motion.flags(now),packet)) radio.send(packet);
   static uint32_t logged=0;

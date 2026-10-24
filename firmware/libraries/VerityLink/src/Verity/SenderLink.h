@@ -12,10 +12,10 @@ class SenderLink {
     uint32_t dropped() const { return dropped_; }
     uint32_t acknowledged() const { return acknowledged_; }
     // Always advance the event counter, including gestures while disconnected.
-    bool nod(uint32_t now, uint8_t flags) {
+    bool nod(uint32_t now, uint8_t flags, uint8_t gesture=DoubleNod) {
         const uint32_t id=next(event_);
         if (!active() || !sensorReady(flags) || pending_) { ++dropped_; return false; }
-        pending_=true; pendingId_=id; nodAt_=now; nodAttempts_=0; return true;
+        pending_=true; pendingId_=id; pendingGesture_=gesture; nodAt_=now; nodAttempts_=0; return true;
     }
     void receive(const Packet& p,uint32_t receivedAt,uint32_t now) {
         if (active() && elapsed(now,lastCamera_)>=STATUS_TTL) resync(now,false);
@@ -59,7 +59,7 @@ class SenderLink {
             if (nodAttempts_>=MAX_ATTEMPTS) { pending_=false; ++dropped_; }
             else {
                 ++nodAttempts_; lastNodAttempt_=now;
-                out=packet(Type::Nod,flags); out.event=pendingId_;
+                out=packet(Type::Nod,flags); out.event=pendingId_; out.gesture=pendingGesture_;
                 out.age=static_cast<uint16_t>(elapsed(now,nodAt_)); return true;
             }
         }
@@ -78,7 +78,7 @@ class SenderLink {
     uint32_t dropped_=0,acknowledged_=0;
     unsigned attempts_=0,nodAttempts_=0;
     bool pending_=false,started_=false;
-    uint8_t lastFlags_=0;
+    uint8_t lastFlags_=0,pendingGesture_=DoubleNod;
     Packet packet(Type type,uint8_t flags) {
         Packet p; p.type=type; p.boot=boot_; p.target=camera_; p.token=token_;
         p.seq=next(tx_); p.flags=flags; return p;

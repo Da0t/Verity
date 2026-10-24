@@ -8,8 +8,8 @@ from verity.agents.models import result
 class MockDevice:
     def __init__(self): self.events=asyncio.Queue(); self.captures=0
     async def connect(self): pass
-    def nod(self): self.events.put_nowait(None)
-    async def wait_for_nod(self): await self.events.get()
+    def gesture(self, kind='speak'): self.events.put_nowait(kind)
+    async def wait_for_gesture(self): return await self.events.get()
     async def capture_jpeg(self, timeout=30):
         self.captures+=1
         buffer=io.BytesIO(); Image.new('RGB',(64,64),'white').save(buffer,format='JPEG')

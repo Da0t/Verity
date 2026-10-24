@@ -11,6 +11,9 @@ static const uint8_t VERITY_SENSOR_MAC[6]={0,0,0,0,0,0}; // sensor STA MAC
 #ifndef VERITY_IMU_SCL
 #define VERITY_IMU_SCL 14
 #endif
+#ifndef VERITY_YAW_DIRECTION
+#define VERITY_YAW_DIRECTION 1 // -1 if double-left and double-right are swapped
+#endif
 #ifndef VERITY_PITCH_DIRECTION
 #define VERITY_PITCH_DIRECTION 1
 #endif

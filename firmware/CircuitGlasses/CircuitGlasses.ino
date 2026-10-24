@@ -43,7 +43,7 @@ void setup() {
 }
 
 void loop() {
-  if (Imu::poll()) { BleCamera::notifyNod(); Serial.println("Nod"); }
+  if (uint8_t gesture=Imu::poll()) { BleCamera::notifyNod(gesture); Serial.printf("Gesture %u\n",gesture); }
   BleCamera::poll(Imu::settled());
   delay(2);
 }

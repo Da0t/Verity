@@ -3,3 +3,4 @@
 #include "Verity/CameraLink.h"
 #include "Verity/SenderLink.h"
 #include "Verity/NodDetector.h"
+#include "Verity/GestureDetector.h"

@@ -11,7 +11,7 @@ All multibyte values are little endian. Never transmit a C++ struct directly.
 | Byte | Size | Value |
 | --- | --- | --- |
 | 0 | 2 | ASCII VR |
-| 2 | 1 | Version 1 |
+| 2 | 1 | Version 2 |
 | 3 | 1 | Type |
 | 4 | 4 | Sender boot ID, random nonzero |
 | 8 | 4 | Receiver boot ID (0 only in HELLO) |
@@ -21,9 +21,12 @@ All multibyte values are little endian. Never transmit a C++ struct directly.
 | 24 | 2 | Local event age in ms (NOD only) |
 | 26 | 1 | Motion bits: sensor valid=1, calibrated=2, settled=4 |
 | 27 | 1 | NOD_ACK disposition; 0 for other types |
+| 28 | 1 | Gesture (NOD only, else 0): double nod=1, double left=2, double right=3 |
 
 Types: HELLO=1, CHALLENGE=2, READY=3, READY_ACK=4, STATUS=5, NOD=6,
 NOD_ACK=7, RESET=8, STATUS_ACK=9. A settled flag requires sensor+calibrated flags.
+NOD carries any completed head gesture, not only nods. Version 2 (29 bytes) does
+not interoperate with version 1: reflash the sensor and camera together.
 
 ## Establish a fresh lease
 
@@ -71,9 +74,8 @@ Callbacks do not capture frames, notify BLE, log, allocate per packet or wait.
 Only one radio send is in flight; MAC completion clears that slot. A busy/error
 send may be dropped and the application's bounded retry recovers when possible.
 A missing send callback does not cause an unbounded wait or overlapping sends;
-the board must be restarted if its radio cannot recover. BLE JPEG messages and
-four-byte nod sequence payloads remain unchanged; the Windows adapter needs no
-production change. A reconnect never drains a historical gesture queue.
+the board must be restarted if its radio cannot recover. BLE JPEG messages are
+unchanged; the BLE nod notification is `seq:u32` plus the gesture byte (5 bytes). A reconnect never drains a historical gesture queue.
 
 Host assertions cover encoding/validation, retries/ACK loss, duplicate/reordered
 traffic, expiration, boot changes, BLE lease invalidation and millis rollover.

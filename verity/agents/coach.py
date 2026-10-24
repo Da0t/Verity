@@ -141,7 +141,7 @@ class Coach:
             raw = await self.provider.generate(system=prompts.PLAN, context=context,
                                                images=[], schema=Plan.model_json_schema())
             plan = Plan.model_validate(raw)
-        if plan.intent in ("next", "repeat", "stop"):
+        if plan.intent in ("next", "back", "repeat", "stop"):
             # Natural paraphrases can be classified by the planner; controls
             # remain deterministic and never reach the answer model/tools.
             if plan.intent == "stop":
@@ -150,10 +150,12 @@ class Coach:
                 previous = next((h["text"] for h in reversed(context["history"])
                                  if h["role"] == "assistant"), "There is no previous answer to repeat.")
                 return result(previous[:600], intent="repeat")
-            index = context["step_index"] + 1
+            index = context["step_index"] + (1 if plan.intent == "next" else -1)
             if index == len(context["steps"]):
                 return result("You are on the last step.", intent="next")
-            output = result(context["steps"][index]["instruction"][:600], intent="next")
+            if index < 0:
+                return result("You are on the first step.", intent="back")
+            output = result(context["steps"][index]["instruction"][:600], intent=plan.intent)
             output["suggested_step_index"] = index
             return output
         if plan.clarification:
@@ -209,7 +211,7 @@ class Coach:
             answer.needs_clarification = True
         if answer.suggested_step_index is not None:
             raise ValueError("Model cannot advance assembly steps")
-        if answer.intent in ("next", "repeat", "stop") or answer.intent != plan.intent:
+        if answer.intent in ("next", "back", "repeat", "stop") or answer.intent != plan.intent:
             raise ValueError("Answer cannot change planned intent or control state")
         selected = []
         for source_id in dict.fromkeys(answer.source_ids):
