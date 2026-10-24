@@ -1,6 +1,8 @@
 #pragma once
 // Arduino-ESP32 + NimBLE-Arduino 2.x. Call begin() AFTER esp_camera_init().
 // Camera must produce JPEG. Call poll() frequently from Arduino loop().
+// Optional IMU: call notifyNod() per detected nod; pass poll(settled) so a
+// capture waits (bounded) for head motion to stop.
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 #include <esp_camera.h>
@@ -12,10 +14,12 @@ static const char* SERVICE = "369f0001-7d5c-4f30-a16b-8c578d930001";
 static const char* COMMAND = "369f0002-7d5c-4f30-a16b-8c578d930001";
 static const char* STATUS = "369f0003-7d5c-4f30-a16b-8c578d930001";
 static const char* DATA = "369f0004-7d5c-4f30-a16b-8c578d930001";
+static const char* NOD = "369f0005-7d5c-4f30-a16b-8c578d930001";
+static const uint32_t SETTLE_WAIT_MS = 1500;
 static SemaphoreHandle_t mutex;
-static NimBLECharacteristic *statusChar, *dataChar;
+static NimBLECharacteristic *statusChar, *dataChar, *nodChar;
 static camera_fb_t* frame = nullptr;
-static uint32_t requestId = 0, touched = 0;
+static uint32_t requestId = 0, touched = 0, nodSeq = 0;
 static bool pending = false;
 static uint8_t state = 0; // idle=0, capturing=1, ready=2, error=3
 
@@ -56,7 +60,7 @@ class Commands : public NimBLECharacteristicCallbacks {
         // Each read fits a SINGLE ATT response, including at the minimum MTU.
         size_t count = peer.getMTU() > 5 ? peer.getMTU()-5 : 18;
         count = min(count, sizeof(b)-4);
-        count = min(count, frame->len-offset);
+        count = min(count, static_cast<size_t>(frame->len-offset));
         memcpy(b+4, frame->buf+offset, count);
         dataChar->setValue(b, count+4); touched = millis();
       } else dataChar->setValue("");
@@ -84,14 +88,22 @@ static void begin() {
   command->setCallbacks(&commands);
   statusChar = service->createCharacteristic(STATUS, NIMBLE_PROPERTY::READ);
   dataChar = service->createCharacteristic(DATA, NIMBLE_PROPERTY::READ, 512);
+  nodChar = service->createCharacteristic(NOD, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
   publish(); service->start();
   auto* ad = NimBLEDevice::getAdvertising();
   ad->addServiceUUID(SERVICE); ad->setName("CircuitGlasses");
   ad->enableScanResponse(true); ad->start();
 }
-static void poll() {
+// Notify subscribers of one nod: payload is seq:u32 little-endian.
+static void notifyNod() {
+  uint8_t b[4]; put32(b, ++nodSeq);
+  nodChar->setValue(b, sizeof(b)); nodChar->notify();
+}
+static void poll(bool settled = true) {
   xSemaphoreTake(mutex, portMAX_DELAY);
-  bool capture = pending; pending = false;
+  // Wait for the head to settle so the photo is not motion-blurred, but not forever.
+  bool capture = pending && (settled || uint32_t(millis()-touched) > SETTLE_WAIT_MS);
+  if (capture) pending = false;
   xSemaphoreGive(mutex);
   if (capture) {
     // Discard a buffered frame so the check uses a newly captured view.

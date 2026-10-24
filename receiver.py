@@ -11,6 +11,7 @@ SERVICE = "369f0001-7d5c-4f30-a16b-8c578d930001"
 COMMAND = "369f0002-7d5c-4f30-a16b-8c578d930001"
 STATUS = "369f0003-7d5c-4f30-a16b-8c578d930001"
 DATA = "369f0004-7d5c-4f30-a16b-8c578d930001"
+NOD = "369f0005-7d5c-4f30-a16b-8c578d930001"
 
 
 async def capture_jpeg(client, timeout=60):
@@ -54,6 +55,15 @@ async def capture_jpeg(client, timeout=60):
     return await asyncio.wait_for(transfer(), timeout)
 
 
+def save_jpeg(path, jpeg):
+    """Atomically replace path so a failed capture never leaves a partial file."""
+    destination = Path(path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_suffix(destination.suffix + ".part")
+    temporary.write_bytes(jpeg)
+    temporary.replace(destination)
+
+
 async def main(args):
     from bleak import BleakClient, BleakScanner
     device = await BleakScanner.find_device_by_filter(
@@ -67,12 +77,8 @@ async def main(args):
         while True:
             start = time.monotonic()
             jpeg = await capture_jpeg(client, args.timeout)
-            destination = Path(args.output)
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            temporary = destination.with_suffix(destination.suffix + ".part")
-            temporary.write_bytes(jpeg)
-            temporary.replace(destination)
-            print(f"Saved {len(jpeg):,} bytes to {destination} in {time.monotonic()-start:.1f}s")
+            save_jpeg(args.output, jpeg)
+            print(f"Saved {len(jpeg):,} bytes to {args.output} in {time.monotonic()-start:.1f}s")
             if not args.interactive:
                 return
             answer = await asyncio.to_thread(input, "Enter = fresh photo; q = quit: ")
