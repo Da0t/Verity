@@ -1,7 +1,7 @@
 # Firmware verification
 
-The ESP-NOW feature is on local branch `codex/espnow-imu-bridge`, based on pulled
-main commit `486ff77`. No push, merge or hardware flash was performed.
+The ESP-NOW implementation was verified on `codex/espnow-imu-bridge`, based on
+pulled main commit `486ff77`. No hardware flash was performed.
 
 Toolchain: Arduino-ESP32 **3.3.3**, NimBLE-Arduino **2.3.6**, repo-local
 **VerityLink 0.1.0**. ESP-NOW callbacks were checked against the installed ESP-IDF

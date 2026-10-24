@@ -1,6 +1,6 @@
 # Two-board setup: remote MPU-6050 over ESP-NOW
 
-This local feature branch changes the glasses to:
+The two-board firmware uses this hardware path:
 
 ```text
 MPU-6050 -- I2C --> ESP32-WROOM -- ESP-NOW --> ESP32-CAM -- BLE --> Windows laptop

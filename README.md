@@ -9,8 +9,8 @@ builds successfully for AI Thinker ESP32-CAM using Arduino-ESP32 3.3.3 and
 NimBLE-Arduino 2.3.6. Real glasses,
 MPU-6050 calibration, BLE performance and a Windows headset still need bench testing.
 
-This feature branch adds a separate ESP32-WROOM MPU sender over ESP-NOW.
-Start with [two-board setup](docs/ESP_NOW_SETUP.md); this change is local and
+The firmware supports a separate ESP32-WROOM MPU sender over ESP-NOW.
+Start with [two-board setup](docs/ESP_NOW_SETUP.md); the hardware path
 requires bench validation before the demo.
 
 ## Architecture
