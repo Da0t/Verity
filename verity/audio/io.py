@@ -1,0 +1,125 @@
+"""Short mono recordings with energy-based end-of-utterance detection."""
+import asyncio
+from collections import deque
+import io
+import time
+import wave
+import numpy as np
+
+
+def wav_bytes(pcm, rate=16000):
+    output = io.BytesIO()
+    with wave.open(output, 'wb') as target:
+        target.setnchannels(1); target.setsampwidth(2); target.setframerate(rate)
+        target.writeframes(np.asarray(pcm, dtype='<i2').tobytes())
+    return output.getvalue()
+
+
+class Utterance:
+    def __init__(self, rate=16000, threshold=0.015, silence=0.8, min_speech=0.12):
+        self.rate = rate; self.threshold = threshold
+        self.silence = silence; self.min_speech = min_speech
+        self.pre = deque(maxlen=10)
+        self.frames = []; self.voiced = 0; self.quiet = 0
+
+    def feed(self, samples):
+        samples = np.asarray(samples, dtype=np.int16).reshape(-1)
+        duration = len(samples)/self.rate
+        loud = np.sqrt(np.mean((samples.astype(np.float32)/32768)**2)) >= self.threshold
+        if not self.frames:
+            self.pre.append(samples.copy())
+            if not loud: return False
+            self.frames.extend(self.pre); self.pre.clear()
+        else:
+            self.frames.append(samples.copy())
+        if loud:
+            self.voiced += duration; self.quiet = 0
+        else: self.quiet += duration
+        return self.voiced >= self.min_speech and self.quiet >= self.silence
+
+    def finish(self):
+        if self.voiced < self.min_speech: return None
+        return wav_bytes(np.concatenate(self.frames), self.rate)
+
+
+class SoundDeviceIO:
+    def __init__(self, *, input_device=None, output_device=None, threshold=0.015):
+        self.input_device = input_device; self.output_device = output_device
+        self.threshold = threshold
+        self.input_rate=16000; self.output_rate=22050
+        self.input_channels=1; self.output_channels=1
+
+    async def start(self):
+        import sounddevice as sd
+        microphone=sd.query_devices(self.input_device, 'input')
+        speaker=sd.query_devices(self.output_device, 'output')
+        self.input_rate=int(microphone['default_samplerate'])
+        self.output_rate=int(speaker['default_samplerate'])
+        self.input_channels=min(2,int(microphone['max_input_channels']))
+        self.output_channels=min(2,int(speaker['max_output_channels']))
+        sd.check_input_settings(device=self.input_device, channels=self.input_channels,
+                                dtype='int16', samplerate=self.input_rate)
+        sd.check_output_settings(device=self.output_device, channels=self.output_channels,
+                                 dtype='float32', samplerate=self.output_rate)
+
+    async def record(self, timeout):
+        import sounddevice as sd
+        loop = asyncio.get_running_loop(); queue = asyncio.Queue(maxsize=64)
+        utterance = Utterance(rate=self.input_rate, threshold=self.threshold)
+        def deliver(value):
+            if queue.full():
+                queue.get_nowait()
+                queue.put_nowait(RuntimeError('Microphone queue overflow'))
+            else: queue.put_nowait(value)
+        def callback(indata, frames, timing, status):
+            value = (RuntimeError('Microphone input overflow') if status else
+                     indata.astype(np.int32).mean(axis=1).astype(np.int16))
+            loop.call_soon_threadsafe(deliver, value)
+        stream = sd.InputStream(samplerate=self.input_rate, blocksize=int(self.input_rate*0.02),
+                                channels=self.input_channels,
+                                dtype='int16', device=self.input_device, callback=callback)
+        deadline = time.monotonic()+timeout
+        try:
+            stream.start()
+            while True:
+                remaining = deadline-time.monotonic()
+                if remaining <= 0: break
+                try: value = await asyncio.wait_for(queue.get(), remaining)
+                except TimeoutError: break
+                if isinstance(value, Exception): raise value
+                if utterance.feed(value): break
+        finally:
+            stream.abort(); stream.close()
+        return utterance.finish()
+
+    async def play(self, wav):
+        import sounddevice as sd
+        with wave.open(io.BytesIO(wav), 'rb') as source:
+            if source.getsampwidth() != 2: raise ValueError('Playback requires 16-bit PCM WAV')
+            rate=source.getframerate(); channels=source.getnchannels()
+            samples=np.frombuffer(source.readframes(source.getnframes()), dtype='<i2').reshape(-1,channels)
+        samples = samples.astype(np.float32)/32768
+        samples = samples.mean(axis=1)
+        if rate != self.output_rate:
+            count=max(1,round(len(samples)*self.output_rate/rate))
+            samples=np.interp(np.arange(count)*rate/self.output_rate,
+                              np.arange(len(samples)),samples).astype(np.float32)
+        samples=np.repeat(samples[:,None],self.output_channels,axis=1)
+        rate=self.output_rate; channels=self.output_channels
+        offset = 0; loop = asyncio.get_running_loop(); done = asyncio.Event()
+        def callback(outdata, frames, timing, status):
+            nonlocal offset
+            count=min(frames, len(samples)-offset); outdata.fill(0)
+            if count: outdata[:count] = samples[offset:offset+count]
+            offset += count
+            if offset >= len(samples): raise sd.CallbackStop
+        stream=sd.OutputStream(samplerate=rate, channels=channels, dtype='float32',
+            device=self.output_device, callback=callback,
+            finished_callback=lambda: loop.call_soon_threadsafe(done.set))
+        try:
+            stream.start()
+            await asyncio.wait_for(done.wait(), len(samples)/rate+5)
+        finally:
+            stream.abort(); stream.close()
+
+    async def close(self): pass
