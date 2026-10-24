@@ -15,12 +15,16 @@
 #define VERITY_PITCH_DIRECTION 1
 #endif
 
+#ifndef VERITY_IMU_DEBUG
+#define VERITY_IMU_DEBUG 0
+#endif
+
 #if VERITY_ENABLE_MPU6050
 #include <Wire.h>
 namespace Imu {
 static NodDetector detector;
 static uint8_t address = 0x68;
-static uint32_t last = 0;
+static uint32_t last = 0, lastDebug = 0;
 static float filtered = 0, neutral = 0;
 static uint16_t calibrated = 0;
 static bool ready = false;
@@ -46,6 +50,7 @@ static bool begin() {
   if (!ready) { Serial.println("MPU-6050 not found; IMU activation unavailable."); return false; }
   // Wake; +/-2g accelerometer, +/-250 deg/s gyro; ~44Hz low-pass filter.
   ready = write(0x6b, 0x00) && write(0x1c, 0x00) && write(0x1b, 0x00) && write(0x1a, 0x03);
+  if (!ready) { Serial.println("MPU-6050 configuration failed; check wiring and power."); return false; }
   Serial.println("Keep glasses still for two seconds to calibrate nod activation.");
   return ready;
 }
@@ -68,7 +73,12 @@ static bool poll() {
     return false;
   }
   filtered = 0.7f*filtered+0.3f*pitch;
-  return detector.update(filtered-neutral, now);
+  bool nod = detector.update(filtered-neutral, now);
+  if (VERITY_IMU_DEBUG && uint32_t(now-lastDebug) >= 100) {
+    lastDebug=now;
+    Serial.printf("pitch %.1f neutral %.1f settled %d\n", filtered-neutral, detector.neutral, detector.settled(now));
+  }
+  return nod;
 }
 }
 #else

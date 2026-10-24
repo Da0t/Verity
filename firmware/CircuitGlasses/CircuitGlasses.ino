@@ -38,7 +38,7 @@ void setup() {
 }
 
 void loop() {
-  if (Imu::poll()) BleCamera::notifyNod();
+  if (Imu::poll()) { BleCamera::notifyNod(); Serial.println("Nod"); }
   BleCamera::poll(Imu::settled());
   delay(2);
 }

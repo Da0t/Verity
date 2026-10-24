@@ -60,7 +60,7 @@ class Commands : public NimBLECharacteristicCallbacks {
         // Each read fits a SINGLE ATT response, including at the minimum MTU.
         size_t count = peer.getMTU() > 5 ? peer.getMTU()-5 : 18;
         count = min(count, sizeof(b)-4);
-        count = min(count, frame->len-offset);
+        count = min(count, static_cast<size_t>(frame->len-offset));
         memcpy(b+4, frame->buf+offset, count);
         dataChar->setValue(b, count+4); touched = millis();
       } else dataChar->setValue("");
