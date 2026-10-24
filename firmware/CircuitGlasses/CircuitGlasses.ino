@@ -1,6 +1,7 @@
 // Example ONLY for the AI Thinker-compatible original ESP32-CAM pinout.
 // Check the module marking/pinout; an MB USB baseboard alone does not identify it.
 #include "BleCamera.h"
+#include "Imu.h"
 
 #if !CONFIG_IDF_TARGET_ESP32
 #error "This example pinout targets original ESP32, not ESP32-S3/S2."
@@ -32,10 +33,12 @@ void setup() {
     while (true) delay(1000);
   }
   BleCamera::begin();
+  Imu::begin();
   Serial.println("CircuitGlasses BLE ready; no Wi-Fi connection required.");
 }
 
 void loop() {
+  if (Imu::poll()) BleCamera::notifyNod();
   BleCamera::poll();
   delay(2);
 }

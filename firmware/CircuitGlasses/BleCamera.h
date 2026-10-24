@@ -12,6 +12,9 @@ static const char* SERVICE = "369f0001-7d5c-4f30-a16b-8c578d930001";
 static const char* COMMAND = "369f0002-7d5c-4f30-a16b-8c578d930001";
 static const char* STATUS = "369f0003-7d5c-4f30-a16b-8c578d930001";
 static const char* DATA = "369f0004-7d5c-4f30-a16b-8c578d930001";
+static const char* NOD = "369f0005-7d5c-4f30-a16b-8c578d930001";
+static NimBLECharacteristic* nodChar;
+static uint32_t nodSequence = 0;
 static SemaphoreHandle_t mutex;
 static NimBLECharacteristic *statusChar, *dataChar;
 static camera_fb_t* frame = nullptr;
@@ -84,10 +87,15 @@ static void begin() {
   command->setCallbacks(&commands);
   statusChar = service->createCharacteristic(STATUS, NIMBLE_PROPERTY::READ);
   dataChar = service->createCharacteristic(DATA, NIMBLE_PROPERTY::READ, 512);
+  nodChar = service->createCharacteristic(NOD, NIMBLE_PROPERTY::NOTIFY);
   publish(); service->start();
   auto* ad = NimBLEDevice::getAdvertising();
   ad->addServiceUUID(SERVICE); ad->setName("CircuitGlasses");
   ad->enableScanResponse(true); ad->start();
+}
+static void notifyNod() {
+  uint8_t packet[8]; put32(packet, ++nodSequence); put32(packet+4, millis());
+  nodChar->setValue(packet, sizeof(packet)); nodChar->notify();
 }
 static void poll() {
   xSemaphoreTake(mutex, portMAX_DELAY);
