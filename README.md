@@ -3,8 +3,7 @@
 Hands-free electronics assembly guidance: nod to activate, ask a question or
 request a visual check, and hear a short response through a headset.
 
-All four software components are implemented and merged on
-**`codex/session-integration`**: device/IMU, voice, build agents and controller.
+All four software components are implemented and integrated on **`main`**: device/IMU, voice, build agents and controller.
 The software scenario and hosted speech/vision path have been tested. Firmware
 builds successfully for AI Thinker ESP32-CAM using Arduino-ESP32 3.3.3 and
 NimBLE-Arduino 2.3.6. Real glasses,
@@ -27,12 +26,12 @@ laptop internet is required for hosted calls.
 
 ## Windows quick start
 
-Use your own clone and the integration branch:
+Use your own clone and the main branch:
 
 ```powershell
 git clone https://github.com/Da0t/Verity.git
 cd Verity
-git switch codex/session-integration
+git switch main
 py -3 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe -m verity.agents.setup --model gemini-3.5-flash-lite --save

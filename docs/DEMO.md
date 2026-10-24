@@ -1,6 +1,6 @@
 # Integrated demo and validation
 
-Use branch `codex/session-integration`. It merges the actual implementations from
+Use branch `main`. It contains the integrated implementations from
 codex/build-agents, codex/device-transport and codex/voice-interface. The entry point
 is `python -m verity.app`; component contracts remain in docs/CONTRACTS.md.
 
@@ -53,6 +53,6 @@ passes do not automatically advance. Only one model turn/capture runs at a time.
 
 ## Merge and release
 
-All software changes are integrated on the session-integration branch and can be
-reviewed/tested there. Keep main unchanged until the physical acceptance run is
-complete. Record a backup video and report remaining hardware limitations honestly.
+All software changes are integrated on main at the user's request. Physical
+acceptance is still pending; merging the software does not establish hardware
+readiness. Record a backup video and report remaining hardware limitations honestly.

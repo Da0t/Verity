@@ -15,10 +15,9 @@ Repository: https://github.com/Da0t/Verity (private; teammates need access).
 
 ## Current integration branch
 
-All four software workstreams are implemented and merged on
-`codex/session-integration`. Start there for the complete app; `main` remains
-unchanged pending the physical acceptance run. README.md is the current launch
-guide. Quick software-only check: `python -m verity.app --mock`.
+All four software workstreams are implemented and integrated on `main`.
+The user requested merging the software before physical acceptance; hardware
+validation remains pending. README.md is the current launch guide. Quick software-only check: `python -m verity.app --mock`.
 
 ## Architecture decisions
 
