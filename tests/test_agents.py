@@ -1,6 +1,8 @@
 """Behavior and failure-path tests; simulated providers, not accuracy benchmarks."""
 import asyncio
 import copy
+from contextlib import redirect_stdout
+from types import SimpleNamespace
 import io
 import json
 from pathlib import Path
@@ -13,6 +15,7 @@ from PIL import Image
 from verity.agents.coach import Coach
 from verity.agents.knowledge import KnowledgeStore
 from verity.agents.provider import GeminiProvider, ProviderError
+from verity.agents.setup import configure
 
 
 def session():
@@ -261,6 +264,27 @@ class CoachTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ValueError):
             await self.ask(coach, state=state)
         self.assertFalse(provider.calls)
+
+
+class SetupTests(unittest.IsolatedAsyncioTestCase):
+    async def test_dotted_auth_key_accepted_without_printing_secret(self):
+        secret = "AQ.test-key-not-real"
+        async def handle(request):
+            self.assertEqual(request.headers["x-goog-api-key"], secret)
+            return httpx.Response(200, json={"models": [{"name": "models/test-model",
+                "supportedGenerationMethods": ["generateContent"]}]})
+        client = httpx.AsyncClient(transport=httpx.MockTransport(handle))
+        provider = FakeProvider({"black_rectangle_visible": True})
+        output = io.StringIO()
+        with patch.dict("os.environ", {}, clear=True), \
+             patch("verity.agents.setup.load_config", return_value={"GEMINI_API_KEY": secret}), \
+             patch("verity.agents.setup.httpx.AsyncClient", return_value=client), \
+             patch("verity.agents.setup.GeminiProvider", return_value=provider), \
+             redirect_stdout(output):
+            await configure(SimpleNamespace(model="test-model", save=False))
+        self.assertIn("PASS", output.getvalue())
+        self.assertNotIn(secret, output.getvalue())
+        self.assertTrue(provider.closed)
 
 
 class ProviderTests(unittest.IsolatedAsyncioTestCase):

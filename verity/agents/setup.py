@@ -18,7 +18,7 @@ async def configure(args):
     key = os.getenv("GEMINI_API_KEY") or config.get("GEMINI_API_KEY")
     if not key:
         key = getpass.getpass("Gemini API key (hidden): ").strip()
-    if not key or not re.fullmatch(r"[A-Za-z0-9_-]+", key):
+    if not key or not re.fullmatch(r"[A-Za-z0-9._-]+", key):
         raise ValueError("Expected a nonempty Gemini API key")
     available = []
     async with httpx.AsyncClient(timeout=20) as client:
@@ -85,7 +85,7 @@ def main():
     args = parser.parse_args()
     try:
         asyncio.run(configure(args))
-    except (httpx.HTTPError, ValueError, ProviderError, EOFError, KeyboardInterrupt) as exc:
+    except (httpx.HTTPError, TimeoutError, ValueError, ProviderError, EOFError, KeyboardInterrupt) as exc:
         # Never emit SDK request objects, headers or secrets.
         message = str(exc) if isinstance(exc, (ValueError, ProviderError)) else type(exc).__name__
         parser.exit(1, f"Setup failed: {message}\n")
