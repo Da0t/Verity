@@ -49,6 +49,7 @@ static bool begin() {
   Serial.println("Keep glasses still for two seconds to calibrate nod activation.");
   return ready;
 }
+static bool settled() { return ready && calibrated >= 100 && detector.settled(millis()); }
 static bool poll() {
   uint32_t now = millis();
   if (!ready || uint32_t(now-last) < 20) return false;
@@ -73,6 +74,8 @@ static bool poll() {
 #else
 namespace Imu {
 static bool begin() { Serial.println("IMU driver disabled. Configure Imu.h for real nod activation."); return false; }
+static bool settled() { return ready && calibrated >= 100 && detector.settled(millis()); }
+static bool settled() { return true; }
 static bool poll() { return false; }
 }
 #endif

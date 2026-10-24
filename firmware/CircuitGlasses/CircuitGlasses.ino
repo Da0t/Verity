@@ -39,6 +39,6 @@ void setup() {
 
 void loop() {
   if (Imu::poll()) BleCamera::notifyNod();
-  BleCamera::poll();
+  BleCamera::poll(Imu::settled());
   delay(2);
 }
