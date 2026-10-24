@@ -1,6 +1,6 @@
 # Laptop voice setup
 
-Implemented: listening/working/error tones, 16kHz mono recording, amplitude-based
+Implemented: listening/working/error tones, mono recording at the microphone’s native sample rate, amplitude-based
 speech/silence detection, hosted Gemini transcription, local system TTS and
 cancellable playback. Audio never traverses the ESP32 BLE link.
 
@@ -19,8 +19,8 @@ account needed. Text/path are sent through a JSON stdin payload, not shell comma
 The synthesis subprocess is killed on cancellation and playback streams abort.
 
 Run `python -m sounddevice` to list device IDs. The integrated app accepts
---input-device and --output-device. Recording requires 16kHz mono and the output
-must accept the generated WAV rate. Choose the same physical headset for output
+--input-device and --output-device. Recording uses the device’s default rate and downmixes to mono. Playback is
+resampled to the selected output device’s default rate/channels. Choose the same physical headset for output
 and microphone input. No browser Web Bluetooth or browser microphone is needed.
 
 For macOS development, system synthesis uses say + afconvert. Linux requires an
