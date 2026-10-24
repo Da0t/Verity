@@ -5,7 +5,9 @@ request a visual check, and hear a short response through a headset.
 
 All four software components are implemented and merged on
 **`codex/session-integration`**: device/IMU, voice, build agents and controller.
-The software scenario and hosted speech/vision path have been tested. Real glasses,
+The software scenario and hosted speech/vision path have been tested. Firmware
+builds successfully for AI Thinker ESP32-CAM using Arduino-ESP32 3.3.3 and
+NimBLE-Arduino 2.3.6. Real glasses,
 MPU-6050 calibration, BLE performance and a Windows headset still need bench testing.
 
 ## Architecture
@@ -52,7 +54,7 @@ no BLE hardware, microphone or API key after dependencies are installed.
    baseboard alone does not identify the camera board. Follow
    [device setup](docs/DEVICE_SETUP.md) and open
    `firmware/CircuitGlasses/CircuitGlasses.ino` in Arduino IDE.
-2. Use Arduino-ESP32 3.x and NimBLE-Arduino 2.x. The confirmed IMU is MPU-6050.
+2. Use the tested Arduino-ESP32 **3.3.3** and NimBLE-Arduino **2.3.6**. The confirmed IMU is MPU-6050.
    Proposed I2C pins are **SDA13/SCL14**, only with the matching board pinout,
    unused SD interface and verified module power/pull-ups. Camera pins stay reserved.
    See Imu.h for configuration and gesture direction. Serial Monitor: 115200.

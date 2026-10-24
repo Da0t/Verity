@@ -6,6 +6,8 @@ is `python -m verity.app`; component contracts remain in docs/CONTRACTS.md.
 
 ## Validation performed October 24, 2026
 
+* Complete firmware builds for AI Thinker ESP32-CAM using Arduino-ESP32 3.3.3
+  and NimBLE-Arduino 2.3.6 (MPU-6050 enabled). Not flashed or tested on a board.
 * A clean virtual environment installed requirements.txt successfully.
 * 68 automated tests pass across component contracts and the session state machine.
 * Scripted `python -m verity.app --mock` completes six turns: instruction, check,
@@ -19,7 +21,7 @@ is `python -m verity.app`; component contracts remain in docs/CONTRACTS.md.
 
 ## Hardware checks still required
 
-1. Compile and flash for the actual ESP32-CAM board, then verify MPU-6050 identity,
+1. Flash for the actual ESP32-CAM board (the software build is verified), then verify MPU-6050 identity,
    neutral calibration and nod direction. Confirm no SD/pin conflict.
 2. Capture ten actual JPEGs at the working distance; measure transfer latency and
    whether the intended connection is visible. Ensure disconnect causes a clear

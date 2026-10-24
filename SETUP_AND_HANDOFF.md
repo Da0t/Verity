@@ -60,6 +60,8 @@ Implemented since the initial handoff:
 * Microphone recording, Gemini transcription, system speech and cancellation.
 * Hosted coach, image inspection and scoped cached-document lookup.
 * Integrated session controller and a clearly labeled scripted mock scenario.
+* Firmware compiles for AI Thinker ESP32-CAM with Arduino-ESP32 3.3.3 and
+  NimBLE-Arduino 2.3.6, with MPU-6050 enabled. Not flashed on hardware.
 * 68 passing automated tests in a clean environment, including host C++ gesture tests.
 * A real hosted STT → coach image check → local synthesis diagnostic completed
   in 6.1 seconds using synthetic audio and a blank image, with one capture.
@@ -102,8 +104,8 @@ py -3 -m venv .venv
 ```
 
 Using the virtual environment's executable directly avoids PowerShell activation
-policy changes. The current dependency is Bleak; each component owner will add
-their own dependency file as implementation proceeds.
+policy changes. Root requirements.txt includes the device, voice, agent and app
+dependency files; install it for the complete integrated app.
 
 Enable Bluetooth in Windows and confirm the laptop has a BLE-capable adapter.
 The ESP32's USB baseboard provides programming/power; it does not supply Bluetooth
