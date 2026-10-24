@@ -4,6 +4,7 @@
 // Optional IMU: call notifyNod() per detected nod; pass poll(settled) so a
 // capture waits (bounded) for head motion to stop.
 #include <Arduino.h>
+#include <atomic>
 #include <NimBLEDevice.h>
 #include <esp_camera.h>
 #include <freertos/FreeRTOS.h>
@@ -16,11 +17,16 @@ static const char* STATUS = "369f0003-7d5c-4f30-a16b-8c578d930001";
 static const char* DATA = "369f0004-7d5c-4f30-a16b-8c578d930001";
 static const char* NOD = "369f0005-7d5c-4f30-a16b-8c578d930001";
 static const uint32_t SETTLE_WAIT_MS = 1500;
-static SemaphoreHandle_t mutex;
+static SemaphoreHandle_t mutex, nodMutex;
+static uint16_t nodConnection=BLE_HS_CONN_HANDLE_NONE;
 static NimBLECharacteristic *statusChar, *dataChar, *nodChar;
 static camera_fb_t* frame = nullptr;
 static uint32_t requestId = 0, touched = 0, nodSeq = 0;
 static bool pending = false;
+static std::atomic<bool> nodSubscribed{false};
+static std::atomic<uint32_t> connectionEpoch{0};
+static bool canNotifyNod() { return nodSubscribed.load(); }
+static uint32_t epoch() { return connectionEpoch.load(); }
 static uint8_t state = 0; // idle=0, capturing=1, ready=2, error=3
 
 static uint32_t read32(const uint8_t* p) {
@@ -72,15 +78,28 @@ class Connections : public NimBLEServerCallbacks {
   void onConnect(NimBLEServer* s, NimBLEConnInfo& peer) override {
     if (s->getConnectedCount() > 1) s->disconnect(peer.getConnHandle());
   }
-  void onDisconnect(NimBLEServer*, NimBLEConnInfo&, int) override {
+  void onDisconnect(NimBLEServer*, NimBLEConnInfo& peer, int) override {
+    xSemaphoreTake(nodMutex, portMAX_DELAY);
+    if (nodConnection==peer.getConnHandle()) {
+      nodSubscribed=false; nodConnection=BLE_HS_CONN_HANDLE_NONE; ++connectionEpoch;
+    }
+    xSemaphoreGive(nodMutex);
     NimBLEDevice::startAdvertising();
   }
 };
+class NodSubscriptions : public NimBLECharacteristicCallbacks {
+  void onSubscribe(NimBLECharacteristic*, NimBLEConnInfo& peer, uint16_t value) override {
+    xSemaphoreTake(nodMutex, portMAX_DELAY);
+    nodSubscribed=(value & 1)!=0; nodConnection=peer.getConnHandle(); ++connectionEpoch;
+    xSemaphoreGive(nodMutex);
+  }
+};
+static NodSubscriptions subscriptions;
 static Commands commands;
 static Connections connections;
 static void begin() {
-  mutex = xSemaphoreCreateMutex();
-  configASSERT(mutex);
+  mutex = xSemaphoreCreateMutex(); nodMutex=xSemaphoreCreateMutex();
+  configASSERT(mutex && nodMutex);
   NimBLEDevice::init("CircuitGlasses"); NimBLEDevice::setMTU(247);
   auto* server = NimBLEDevice::createServer(); server->setCallbacks(&connections);
   auto* service = server->createService(SERVICE);
@@ -89,21 +108,33 @@ static void begin() {
   statusChar = service->createCharacteristic(STATUS, NIMBLE_PROPERTY::READ);
   dataChar = service->createCharacteristic(DATA, NIMBLE_PROPERTY::READ, 512);
   nodChar = service->createCharacteristic(NOD, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
+  nodChar->setCallbacks(&subscriptions);
   publish(); service->start();
   auto* ad = NimBLEDevice::getAdvertising();
   ad->addServiceUUID(SERVICE); ad->setName("CircuitGlasses");
   ad->enableScanResponse(true); ad->start();
 }
 // Notify subscribers of one nod: payload is seq:u32 little-endian.
-static void notifyNod() {
-  uint8_t b[4]; put32(b, ++nodSeq);
-  nodChar->setValue(b, sizeof(b)); nodChar->notify();
+static bool notifyNod(uint32_t expectedEpoch) {
+  xSemaphoreTake(nodMutex, portMAX_DELAY);
+  bool sent=false;
+  if (canNotifyNod() && epoch()==expectedEpoch) {
+    uint8_t b[4]; put32(b, ++nodSeq);
+    nodChar->setValue(b, sizeof(b));
+    sent=nodChar->notify(b, sizeof(b), nodConnection);
+  }
+  xSemaphoreGive(nodMutex);
+  return sent;
 }
+static bool notifyNod() { return notifyNod(epoch()); }
 static void poll(bool settled = true) {
   xSemaphoreTake(mutex, portMAX_DELAY);
   // Wait for the head to settle so the photo is not motion-blurred, but not forever.
   bool capture = pending && (settled || uint32_t(millis()-touched) > SETTLE_WAIT_MS);
-  if (capture) pending = false;
+  if (capture) {
+    pending = false;
+    if (!settled) Serial.println("Capture timeout: proceeding without settled IMU confirmation.");
+  }
   xSemaphoreGive(mutex);
   if (capture) {
     // Discard a buffered frame so the check uses a newly captured view.

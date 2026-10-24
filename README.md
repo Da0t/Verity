@@ -9,10 +9,14 @@ builds successfully for AI Thinker ESP32-CAM using Arduino-ESP32 3.3.3 and
 NimBLE-Arduino 2.3.6. Real glasses,
 MPU-6050 calibration, BLE performance and a Windows headset still need bench testing.
 
+This feature branch adds a separate ESP32-WROOM MPU sender over ESP-NOW.
+Start with [two-board setup](docs/ESP_NOW_SETUP.md); this change is local and
+requires bench validation before the demo.
+
 ## Architecture
 
 ```text
-ESP32-CAM JPEG + MPU-6050 nod ── BLE ──► Windows session controller
+MPU-6050 → ESP32-WROOM ── ESP-NOW ──► ESP32-CAM ── BLE ──► Windows session controller
 Headset microphone ── Gemini transcription ──► build coach / inspection / docs
                                                      │
 Headset ◄── local system TTS + cancellable playback ◄──┘
@@ -53,13 +57,12 @@ no BLE hardware, microphone or API key after dependencies are installed.
    baseboard alone does not identify the camera board. Follow
    [device setup](docs/DEVICE_SETUP.md) and open
    `firmware/CircuitGlasses/CircuitGlasses.ino` in Arduino IDE.
-2. Use the tested Arduino-ESP32 **3.3.3** and NimBLE-Arduino **2.3.6**. The confirmed IMU is MPU-6050.
-   Proposed I2C pins are **SDA13/SCL14**, only with the matching board pinout,
-   unused SD interface and verified module power/pull-ups. Camera pins stay reserved.
-   See Imu.h for configuration and gesture direction. Serial Monitor: 115200.
-3. Power the camera and keep the glasses still for about two seconds for calibration.
-   Missing IMU or disabled driver is reported on Serial Monitor. The prototype
-   BLE device still advertises as `CircuitGlasses`.
+2. Install Arduino-ESP32 **3.3.3**, NimBLE-Arduino **2.3.6**, and the repo's
+   shared `VerityLink` library. Follow [two-board setup](docs/ESP_NOW_SETUP.md) for
+   the sensor sketch, verified I2C wiring, mutual STA MACs and fixed channel.
+3. Power both boards and hold the sensor still for about two seconds to calibrate.
+   Check fresh motion status before proceeding. The BLE device still advertises
+   as `CircuitGlasses`.
 4. Enable laptop Bluetooth and connect a USB/wired headset with microphone.
    Windows must allow microphone access for desktop apps. List audio devices:
 
