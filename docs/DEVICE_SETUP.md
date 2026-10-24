@@ -28,7 +28,9 @@ those pins, and the confirmed AI Thinker pinout. Check the module's power and
 pull-up requirements. GPIO13/14 also serve the SD interface; never enable both.
 Change VERITY_IMU_SDA/SCL for your verified wiring. Camera SCCB pins 26/27 remain
 reserved for the camera. If a downward nod decreases pitch, change
-VERITY_PITCH_DIRECTION to -1. Other mounting axes need a corresponding pitch formula.
+VERITY_PITCH_DIRECTION to -1. Other mounting axes need a corresponding pitch formula. Set VERITY_IMU_DEBUG
+to 1 in Imu.h for 10Hz pitch/neutral/settled logs; each detected event also
+prints Nod once on Serial Monitor.
 
 Another IMU requires its own sensor readout; the pure NodDetector can be reused.
 Do not claim an MPU-6050 driver works for an unidentified sensor. Camera capture
@@ -38,9 +40,18 @@ can briefly block IMU sampling in the Arduino loop; test activation during check
 
 `python -m unittest discover -s tests -v` tests the laptop adapter with a fake BLE
 client. On hosts with g++, a test compiles and exercises the pure gesture detector.
-The Arduino/ESP32 sketch is **not compiled or flashed here**. BLE, pin assignments,
+The complete camera + enabled MPU-6050 sketch **compiled successfully** for
+`esp32:esp32:esp32cam`, Arduino-ESP32 3.3.3 and NimBLE-Arduino 2.3.6. It uses
+708,967 bytes of flash and 47,996 bytes of static global RAM; dynamic heap use
+and physical behavior have not been measured. It has **not been flashed here**. BLE, pin assignments,
 IMU direction/calibration and gesture false positives need actual hardware testing.
-Start from the camera setup in README.md, then test ten photos and deliberate nods.
+In Arduino IDE select AI Thinker ESP32-CAM for the confirmed compatible board,
+select its COM port, enable the board's PSRAM configuration, and choose an
+application partition large enough for the compiled binary. Open
+firmware/CircuitGlasses/CircuitGlasses.ino with BleCamera.h, Imu.h and NodDetector.h
+in the same sketch folder. Upload using the baseboard's boot/reset procedure,
+then reset into normal operation. Read the startup/calibration messages at 115200
+baud. Test ten photos and deliberate nods before attempting the hands-free demo.
 
 Sensor register reference:
 https://invensense.tdk.com/wp-content/uploads/2015/02/MPU-6000-Register-Map1.pdf

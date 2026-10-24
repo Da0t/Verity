@@ -13,6 +13,12 @@ visible wiring mistake that the assistant can identify and help correct.
 
 Repository: https://github.com/Da0t/Verity (private; teammates need access).
 
+## Current integration branch
+
+All four software workstreams are implemented and integrated on `main`.
+The user requested merging the software before physical acceptance; hardware
+validation remains pending. README.md is the current launch guide. Quick software-only check: `python -m verity.app --mock`.
+
 ## Architecture decisions
 
 ```text
@@ -28,12 +34,14 @@ Headset microphone ─────► Windows laptop ─────► Hosted A
 
 * Windows owns Bluetooth, microphone, audio playback, session state and API keys.
 * Camera images are requested on demand, not streamed as continuous video.
-* The IMU is an additional component; its model and wiring are not yet confirmed.
+* The team confirmed an MPU-6050. The proposed GPIO13/14 wiring still needs a
+  physical check against the actual camera board and unused SD interface.
 * A wired/USB headset with a microphone is the preferred initial audio device.
 * Use a hosted model API. No cloud server deployment or rented GPU is required.
 * BLE avoids joining venue Wi-Fi but still uses the 2.4 GHz band. Hosted inference
   still needs laptop internet; phone USB tethering is a possible connection.
-* Cloud provider/model selection is still pending available team credentials.
+* Gemini `gemini-3.5-flash-lite` is configured and live-tested locally. Each new
+  machine must enter its own current key through the hidden setup prompt.
 
 ## Current status — read before starting
 
@@ -45,17 +53,22 @@ Implemented and committed:
 * Six passing simulated receiver tests.
 * Four development branches, component instructions and shared interfaces.
 
-Not yet implemented or verified:
+Implemented since the initial handoff:
 
-* Firmware compilation, flashing and real BLE image transfer on the team's board.
-* Actual image quality and transfer latency at the working distance.
-* IMU nod detection and BLE gesture events.
-* Speech recognition, playback and cancellation.
-* Hosted AI coach, visual inspection and documentation tools.
-* The integrated session controller and hands-free demo.
+* Device adapter, nod notifications, MPU-6050 readout/calibration and gesture logic.
+* Microphone recording, Gemini transcription, system speech and cancellation.
+* Hosted coach, image inspection and scoped cached-document lookup.
+* Integrated session controller and a clearly labeled scripted mock scenario.
+* Firmware compiles for AI Thinker ESP32-CAM with Arduino-ESP32 3.3.3 and
+  NimBLE-Arduino 2.3.6, with MPU-6050 enabled. Not flashed on hardware.
+* 68 passing automated tests in a clean environment, including host C++ gesture tests.
+* A real hosted STT → coach image check → local synthesis diagnostic completed
+  in 6.1 seconds using synthetic audio and a blank image, with one capture.
 
-The current tests validate receiver behavior with simulated data. They do not
-establish radio performance, firmware compatibility or visual inspection quality.
+Still requires physical verification: firmware flashing, camera/BLE latency,
+MPU calibration and false activations, Windows headset compatibility, and the
+actual circuit recipe/reference images. Mock and synthetic checks do not establish
+circuit-recognition accuracy, electrical continuity or safety.
 
 ## 1. Get repository access and clone
 
@@ -90,8 +103,8 @@ py -3 -m venv .venv
 ```
 
 Using the virtual environment's executable directly avoids PowerShell activation
-policy changes. The current dependency is Bleak; each component owner will add
-their own dependency file as implementation proceeds.
+policy changes. Root requirements.txt includes the device, voice, agent and app
+dependency files; install it for the complete integrated app.
 
 Enable Bluetooth in Windows and confirm the laptop has a BLE-capable adapter.
 The ESP32's USB baseboard provides programming/power; it does not supply Bluetooth
@@ -205,15 +218,15 @@ IDLE → nod → listening tone → LISTENING
 
 ## 8. Credentials and configuration
 
-Person 3 chooses a hosted provider based on credentials the team actually has,
-verifies its current SDK/model support, and shares configuration variable names.
-Person 2 coordinates speech-provider access. There is no configured API key yet.
+The tested hosted provider is Gemini with gemini-3.5-flash-lite for the coach
+and transcription. Configure it with `python -m verity.agents.setup
+--model gemini-3.5-flash-lite --save` from the repository root. The development machine has local ignored configuration; keys are never shared through Git.
 
 Store keys in environment variables or a local ignored `.env` file. Never paste
 keys into source, documentation, commits, recordings or screenshots. Person 4
-will create `.env.example` containing variable names and placeholders only.
-Local `.env` files are not loaded automatically unless the implementation adds
-that behavior. Do not assume the existing receiver uses a hosted API—it does not.
+has created `.env.example` containing variable names and placeholders only.
+The agent loads `.env.agents` automatically from the working directory; generic
+`.env` files are not loaded. Do not assume the existing receiver uses a hosted API—it does not.
 
 ## 9. Integration schedule and Git workflow
 
@@ -253,10 +266,10 @@ times with the real hardware. Also test stop, unclear images and disconnection.
 
 Still needed from the team:
 
-* Exact camera board and IMU identification; available pins.
+* Exact camera pinout and MPU-6050 GPIO13/14 wiring; available pins.
 * Headset/microphone and working Windows Bluetooth adapter.
 * Exact demonstration circuit, correct reference photos and documentation.
-* Hosted API provider access and agreed model configuration.
+* A current Gemini API key configured locally on the receiving Windows laptop.
 * Assignment of actual teammate names to Persons 1–4.
 
 ## Troubleshooting
