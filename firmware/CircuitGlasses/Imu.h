@@ -74,7 +74,6 @@ static bool poll() {
 #else
 namespace Imu {
 static bool begin() { Serial.println("IMU driver disabled. Configure Imu.h for real nod activation."); return false; }
-static bool settled() { return ready && calibrated >= 100 && detector.settled(millis()); }
 static bool settled() { return true; }
 static bool poll() { return false; }
 }
