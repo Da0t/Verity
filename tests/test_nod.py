@@ -12,7 +12,7 @@ class NodTests(unittest.TestCase):
         root=Path(__file__).resolve().parents[1]
         with tempfile.TemporaryDirectory() as tmp:
             binary=Path(tmp)/'nod'
-            subprocess.run(['g++','-std=c++17','-I',str(root/'firmware/CircuitGlasses'),
+            subprocess.run(['g++','-std=c++17','-I',str(root/'firmware/CircuitGlasses'),'-I',str(root/'firmware/libraries/VerityLink/src'),
                 str(root/'firmware/tests/nod_detector_test.cpp'),'-o',str(binary)],
                 check=True,capture_output=True)
             subprocess.run([str(binary)],check=True,capture_output=True)

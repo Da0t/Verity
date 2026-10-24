@@ -1,7 +1,12 @@
 // Example ONLY for the AI Thinker-compatible original ESP32-CAM pinout.
 // Check the module marking/pinout; an MB USB baseboard alone does not identify it.
 #include "BleCamera.h"
+#include "Config.h"
+#if VERITY_USE_ESPNOW_IMU
+#include "RemoteImu.h"
+#else
 #include "Imu.h"
+#endif
 
 #if !CONFIG_IDF_TARGET_ESP32
 #error "This example pinout targets original ESP32, not ESP32-S3/S2."
