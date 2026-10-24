@@ -2,6 +2,7 @@
 import asyncio
 from collections import deque
 import io
+import math
 import time
 import wave
 import numpy as np
@@ -43,13 +44,21 @@ class Utterance:
 
 
 class SoundDeviceIO:
-    def __init__(self, *, input_device=None, output_device=None, threshold=0.015):
+    def __init__(self, *, input_device=None, output_device=None, threshold=0.015, silence=.8):
+        if not math.isfinite(threshold) or not 0 < threshold <= 1:
+            raise ValueError("threshold must be in (0, 1]")
+        if not math.isfinite(silence) or not .1 <= silence <= 3:
+            raise ValueError("silence must be between 0.1 and 3 seconds")
+        self.silence = silence
         self.input_device = input_device; self.output_device = output_device
         self.threshold = threshold
         self.input_rate=16000; self.output_rate=22050
         self.input_channels=1; self.output_channels=1
 
     async def start(self):
+        await asyncio.to_thread(self._check_settings)
+
+    def _check_settings(self):
         import sounddevice as sd
         microphone=sd.query_devices(self.input_device, 'input')
         speaker=sd.query_devices(self.output_device, 'output')
@@ -62,11 +71,13 @@ class SoundDeviceIO:
         sd.check_output_settings(device=self.output_device, channels=self.output_channels,
                                  dtype='float32', samplerate=self.output_rate)
 
-    async def record(self, timeout):
+    async def record(self, timeout, *, detect_silence=True):
         import sounddevice as sd
         loop = asyncio.get_running_loop(); queue = asyncio.Queue(maxsize=64)
-        utterance = Utterance(rate=self.input_rate, threshold=self.threshold)
+        utterance = Utterance(rate=self.input_rate, threshold=self.threshold, silence=self.silence)
+        raw = []; received = False; active = True
         def deliver(value):
+            if not active: return
             if queue.full():
                 queue.get_nowait()
                 queue.put_nowait(RuntimeError('Microphone queue overflow'))
@@ -87,10 +98,15 @@ class SoundDeviceIO:
                 try: value = await asyncio.wait_for(queue.get(), remaining)
                 except TimeoutError: break
                 if isinstance(value, Exception): raise value
-                if utterance.feed(value): break
+                received = True
+                if not detect_silence: raw.append(value)
+                elif utterance.feed(value): break
         finally:
-            stream.abort(); stream.close()
-        return utterance.finish()
+            active = False
+            try: stream.abort()
+            finally: stream.close()
+        if not received: raise RuntimeError("Microphone delivered no audio frames")
+        return utterance.finish() if detect_silence else wav_bytes(np.concatenate(raw), self.input_rate)
 
     async def play(self, wav):
         import sounddevice as sd
@@ -106,20 +122,34 @@ class SoundDeviceIO:
                               np.arange(len(samples)),samples).astype(np.float32)
         samples=np.repeat(samples[:,None],self.output_channels,axis=1)
         rate=self.output_rate; channels=self.output_channels
+        failed = False
         offset = 0; loop = asyncio.get_running_loop(); done = asyncio.Event()
         def callback(outdata, frames, timing, status):
-            nonlocal offset
+            nonlocal offset, failed
+            failed = failed or bool(status)
             count=min(frames, len(samples)-offset); outdata.fill(0)
             if count: outdata[:count] = samples[offset:offset+count]
             offset += count
             if offset >= len(samples): raise sd.CallbackStop
+        def finished():
+            loop.call_soon_threadsafe(done.set)
         stream=sd.OutputStream(samplerate=rate, channels=channels, dtype='float32',
             device=self.output_device, callback=callback,
-            finished_callback=lambda: loop.call_soon_threadsafe(done.set))
+            finished_callback=finished)
         try:
             stream.start()
             await asyncio.wait_for(done.wait(), len(samples)/rate+5)
+            if failed: raise RuntimeError("Audio output underflowed")
         finally:
-            stream.abort(); stream.close()
+            try: stream.abort()
+            finally: stream.close()
 
     async def close(self): pass
+
+
+def earcon(kind):
+    frequencies = {'listening': 880, 'working': 440, 'error': 220}
+    if kind not in frequencies: raise ValueError(f'Unknown cue: {kind}')
+    t = np.arange(2205)/22050
+    samples = (np.sin(2*np.pi*frequencies[kind]*t)*np.hanning(len(t))*3500).astype(np.int16)
+    return wav_bytes(samples, 22050)

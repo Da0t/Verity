@@ -1,12 +1,17 @@
 """Offline system TTS, isolated in cancellable subprocesses, with no shell interpolation."""
 import asyncio
 import json
+import os
+import subprocess
 from pathlib import Path
 import sys
 import tempfile
 
 
 class SystemSynthesizer:
+    def __init__(self, voice_name=None):
+        self.voice_name = voice_name or os.getenv("VERITY_TTS_VOICE", "")
+
     async def synthesize(self, text):
         with tempfile.TemporaryDirectory(prefix='verity-tts-') as directory:
             wav = Path(directory)/'speech.wav'
@@ -17,10 +22,10 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Speech
 $p = [Console]::In.ReadToEnd() | ConvertFrom-Json
 $s = New-Object System.Speech.Synthesis.SpeechSynthesizer
-try { $s.SetOutputToWaveFile($p.path); $s.Speak($p.text) } finally { $s.Dispose() }
+try { if ($p.voice) { $s.SelectVoice($p.voice) }; $s.SetOutputToWaveFile($p.path); $s.Speak($p.text) } finally { $s.Dispose() }
 '''
                 await self._run('powershell.exe', '-NoProfile', '-NonInteractive', '-Command', script,
-                                data=json.dumps({'text': text, 'path': str(wav)}).encode('utf-8'))
+                                data=json.dumps({'text': text, 'path': str(wav), 'voice': self.voice_name}).encode('utf-8'))
             elif sys.platform == 'darwin':
                 source = Path(directory)/'text.txt'; source.write_text(text, encoding='utf-8')
                 aiff = Path(directory)/'speech.aiff'
@@ -31,9 +36,17 @@ try { $s.SetOutputToWaveFile($p.path); $s.Speak($p.text) } finally { $s.Dispose(
             return wav.read_bytes()
 
     async def _run(self, *args, data=None):
-        process = await asyncio.create_subprocess_exec(
+        options = {"creationflags": subprocess.CREATE_NO_WINDOW} if sys.platform == "win32" else {}
+        launch = asyncio.create_task(asyncio.create_subprocess_exec(
             *args, stdin=asyncio.subprocess.PIPE if data else asyncio.subprocess.DEVNULL,
-            stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
+            stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL, **options))
+        try:
+            process = await asyncio.shield(launch)
+        except asyncio.CancelledError:
+            process = await launch
+            if process.returncode is None: process.kill()
+            await process.wait()
+            raise
         try:
             async with asyncio.timeout(20):
                 await process.communicate(data)
