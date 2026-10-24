@@ -8,6 +8,10 @@ __pycache__/
 *.jpg
 *.jpeg
 *.part
+*.wav
+*.mp3
+*.m4a
+*.pcm
 .DS_Store
 Thumbs.db
 build/

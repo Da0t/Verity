@@ -3,6 +3,13 @@
 Hands-free guidance for building electronics. Verity uses camera glasses to
 observe an assembly and aims to provide spoken, step-by-step feedback.
 
+## Team development
+
+Start with the [four-person work plan](docs/TEAM_PLAN.md), then read the
+[shared interfaces](docs/CONTRACTS.md) and your assigned component instructions.
+The target architecture is a Windows laptop with hosted AI APIs, IMU activation,
+headset audio, and bounded inspection/documentation tools.
+
 ## Current prototype: BLE camera transport
 
 Transfers one JPEG from an ESP32 camera to a laptop without joining a Wi-Fi
