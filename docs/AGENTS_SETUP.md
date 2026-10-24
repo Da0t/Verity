@@ -13,7 +13,9 @@ The controller, voice pipeline, BLE device adapter and IMU belong to other branc
   calls total. There are no retries or recursive agent loops.
 * Stop/repeat/next use local handling for known phrases; natural paraphrases can
   be classified by the planner and then handled deterministically.
-* The 45-second overall deadline includes capture, lookup and model time.
+* The 45-second overall deadline includes capture, lookup and model time. Each
+  provider call also has a 30-second total deadline, a 10-second connection limit,
+  and read timeouts. Setup fails cleanly if any deadline is exceeded.
 * Async cancellation propagates through capture and HTTP calls. An already sent
   provider request may still be processed/billed; cancellation prevents its result
   being returned to the app. The controller must also discard outdated turn IDs.
@@ -46,9 +48,24 @@ Then run:
 Paste the key into the terminal's hidden prompt. The script lists models accessible
 with that key and asks for a model ID. Choose a current general multimodal Flash
 model supporting image input and structured output. Current official model docs
-list `gemini-3.8-flash`; availability is checked against your key rather than
-assumed. If the selected model does not accept the required request, setup fails
+list `gemini-3.8-flash`; for this time-sensitive build we recommend the tested
+`gemini-3.5-flash-lite` configuration below. Availability is checked against your
+key rather than assumed. If the selected model does not accept the required request, setup fails
 instead of silently switching providers/models.
+
+For the tested hackathon configuration, use:
+
+```powershell
+.\.venv\Scripts\python.exe -m verity.agents.setup --model gemini-3.5-flash-lite --save
+```
+
+`gemini-3.5-flash-lite` passed live text, image and structured-output checks on
+October 24, 2026. The heavier `gemini-flash-latest` alias and Interactions route
+exceeded our short latency targets in diagnostics. Model listing may include
+older models unavailable to new accounts, so the actual generation test matters.
+No model-specific thinking-budget override is sent: the tested model rejects the
+zero-budget override tried during diagnosis. Keep the explicit, tested model ID
+for this demo. There is no automatic switch to a different model on failure.
 
 The check sends a synthetic black-rectangle JPEG and requires a correct structured
 JSON response. On success it saves only the validated key/model to **.env.agents**,

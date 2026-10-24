@@ -1,4 +1,5 @@
 """Async Gemini REST adapter; no retries, background threads, or API-key logging."""
+import asyncio
 import base64
 import json
 import os
@@ -39,7 +40,10 @@ class GeminiProvider:
             raise ValueError("Set GEMINI_API_KEY and VERITY_MODEL before using the hosted coach")
         if not re.fullmatch(r"[a-zA-Z0-9._-]+", self.model):
             raise ValueError("VERITY_MODEL must be a model ID without URL or models/ prefix")
-        self.client = client or httpx.AsyncClient(timeout=timeout)
+        if not 0 < timeout <= 180:
+            raise ValueError("Provider timeout must be positive and at most 180 seconds")
+        self.timeout = timeout
+        self.client = client or httpx.AsyncClient(timeout=httpx.Timeout(timeout, connect=min(10, timeout)))
         self.owns_client = client is None
 
     async def generate(self, *, system, context, images, schema):
@@ -48,15 +52,18 @@ class GeminiProvider:
             parts.extend([{"text": label}, {"inlineData": {
                 "mimeType": "image/jpeg", "data": base64.b64encode(jpeg).decode("ascii")}}])
         try:
-            response = await self.client.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent",
-                headers={"x-goog-api-key": self.api_key},
-                json={"systemInstruction": {"parts": [{"text": system}]},
-                      "contents": [{"role": "user", "parts": parts}],
-                      "generationConfig": {"responseMimeType": "application/json",
-                                           "responseJsonSchema": schema,
-                                           "maxOutputTokens": 4096}})
-        except httpx.TimeoutException:
+            # httpx read timeouts apply per read; enforce a total request deadline.
+            async with asyncio.timeout(self.timeout):
+                response = await self.client.post(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent",
+                    headers={"x-goog-api-key": self.api_key},
+                    json={"systemInstruction": {"parts": [{"text": system}]},
+                          "contents": [{"role": "user", "parts": parts}],
+                          "generationConfig": {
+                              "responseMimeType": "application/json",
+                              "responseJsonSchema": schema,
+                              "maxOutputTokens": 4096}})
+        except (httpx.TimeoutException, TimeoutError):
             raise TimeoutError("Hosted model timed out") from None
         except httpx.HTTPError:
             raise ProviderError("Hosted model connection failed") from None

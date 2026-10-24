@@ -294,6 +294,7 @@ class ProviderTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(request.headers["x-goog-api-key"], "fake-key")
             body = json.loads(request.content)
             self.assertIn("responseJsonSchema", body["generationConfig"])
+            self.assertNotIn("thinkingConfig", body["generationConfig"])
             self.assertEqual(body["contents"][0]["parts"][2]["inlineData"]["mimeType"], "image/jpeg")
             return httpx.Response(200, json={"candidates": [{"finishReason": "STOP", "content": {
                 "parts": [{"text": '{"ok": true}'}]}}]})
@@ -316,6 +317,22 @@ class ProviderTests(unittest.IsolatedAsyncioTestCase):
                 with self.assertRaises(ProviderError) as caught:
                     await provider.generate(system="test", context={}, images=[], schema={})
                 self.assertNotIn("must-not-log", str(caught.exception))
+
+    async def test_total_deadline_cancels_slow_request(self):
+        cancelled = False
+        async def handle(request):
+            nonlocal cancelled
+            try:
+                await asyncio.sleep(1)
+            except asyncio.CancelledError:
+                cancelled = True
+                raise
+            return httpx.Response(200, json={})
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
+            provider = GeminiProvider(api_key="fake-key", model="test-model", client=client, timeout=0.01)
+            with self.assertRaisesRegex(TimeoutError, "Hosted model timed out"):
+                await provider.generate(system="test", context={}, images=[], schema={})
+        self.assertTrue(cancelled)
 
     async def test_missing_credentials_fail_clearly(self):
         with patch.dict("os.environ", {}, clear=True), patch("verity.agents.provider.load_config", return_value={}):
