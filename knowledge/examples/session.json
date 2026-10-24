@@ -1,0 +1,13 @@
+{
+  "recipe_id": "replace-with-your-real-recipe",
+  "step_index": 0,
+  "steps": [
+    {
+      "id": "connect_labeled_connector",
+      "instruction": "Connect the identified connector to its matching labeled socket.",
+      "expected": "The identified connector is visibly fully seated in the matching labeled socket. Replace this generic template with the exact verified circuit instructions."
+    }
+  ],
+  "history": [],
+  "last_observation": null
+}
