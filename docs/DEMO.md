@@ -7,7 +7,7 @@ is `python -m verity.app`; component contracts remain in docs/CONTRACTS.md.
 ## Validation performed October 24, 2026
 
 * A clean virtual environment installed requirements.txt successfully.
-* 64 automated tests pass across component contracts and the session state machine.
+* 68 automated tests pass across component contracts and the session state machine.
 * Scripted `python -m verity.app --mock` completes six turns: instruction, check,
   question, repeat, next, stop. One simulated photo, clearly labeled mock feedback.
 * Live synthetic speech “Check this” was transcribed correctly by the hosted API.
@@ -23,7 +23,7 @@ is `python -m verity.app`; component contracts remain in docs/CONTRACTS.md.
    neutral calibration and nod direction. Confirm no SD/pin conflict.
 2. Capture ten actual JPEGs at the working distance; measure transfer latency and
    whether the intended connection is visible. Ensure disconnect causes a clear
-   error rather than reusing a cached frame. Restart the app to reconnect.
+   error rather than reusing a cached frame. The adapter attempts a fresh connection; restart the app if discovery fails.
 3. Use the Windows headset `--audio-check`. Tune VAD, verify noise handling and
    interrupt a long spoken answer with a deliberate nod.
 4. Replace the generic template with the actual three-to-five-step circuit,
@@ -44,8 +44,8 @@ The app refuses the template in live mode unless --allow-template is explicitly
 provided. This permits diagnostics but does not establish recipe correctness.
 
 On failure, the turn is cancelled or returns brief spoken feedback and returns
-idle. Disconnection ends the session with cleanup; there is no repeated reconnect
-or cost loop. Capture/model/STT results from cancelled turns are discarded. Normal
+idle. Disconnection starts one bounded discovery/reconnection attempt; a failed scan
+ends the session with cleanup. There is no unlimited reconnect or cost loop. Capture/model/STT results from cancelled turns are discarded. Normal
 listening and speech playback do not overlap. “Next” is manual progression and
 passes do not automatically advance. Only one model turn/capture runs at a time.
 
