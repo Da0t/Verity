@@ -2,12 +2,12 @@
 
 The Device adapter now subscribes to nod notifications and exposes the shared
 connect/wait_for_nod/capture_jpeg/close interface. It uses the existing verified
-JPEG protocol and waits 350ms after activation for the head to settle. Disconnect
-wakes the waiter with an error; the controller exits cleanly so the operator can
-reconnect by restarting. No unlimited reconnection loop or stale image reuse.
+JPEG protocol and waits 350ms after activation for the head to settle. A disconnect prompts one fresh discovery/connection attempt; if that fails, the
+controller exits cleanly. A failed capture raises and never returns an older photo. No unlimited reconnection loop or stale image reuse.
 
 Nod characteristic: `369f0005-7d5c-4f30-a16b-8c578d930001`, NOTIFY.
-Packet: eight bytes, little-endian uint32 sequence followed by uint32 device millis.
+Packet: four bytes, little-endian uint32 sequence. The adapter also accepts an
+eight-byte sequence + timestamp packet for compatibility with the other prototype.
 The laptop timestamps reception, deduplicates sequence values, coalesces events,
 and drops activations older than one second. The camera service UUID is unchanged.
 
@@ -17,8 +17,10 @@ The team confirmed the MPU-6050. Its driver is enabled by default in Imu.h.
 Set VERITY_ENABLE_MPU6050 to 0 for camera-only diagnostics. It checks WHO_AM_I, wakes the
 chip, uses +/-2g and +/-250deg/s ranges, and calibrates a neutral posture from
 100 still samples. Then it detects a deliberate pitch-down and return gesture.
-Default threshold 18 degrees, return within 6 degrees, 180–1500ms duration,
-1800ms cooldown. These values need wearer testing, not just software tests.
+Default threshold 15 degrees, return within 6 degrees, 80–900ms duration,
+1500ms cooldown. Neutral posture follows sustained changes rather than treating
+looking down at the bench as an activation. Camera capture waits for 250ms of
+stillness, with a 1500ms maximum settling delay. These values need wearer testing, not just software tests.
 
 For the included AI Thinker ESP32-CAM example ONLY: candidate SDA=13, SCL=14,
 3.3V logic, common ground. This assumes **no SD card**, no other peripheral using
@@ -48,3 +50,14 @@ baud. Test ten photos and deliberate nods before attempting the hands-free demo.
 
 Sensor register reference:
 https://invensense.tdk.com/wp-content/uploads/2015/02/MPU-6000-Register-Map1.pdf
+
+## Device smoke CLI
+
+`python -m verity.device --count 10` captures on each nod; `--no-nods --count 10`
+captures back-to-back for camera-only checks. The tool reports size and latency
+and saves each successful JPEG atomically. `--address` selects a device.
+
+This branch merges the concurrent device implementation rather than replacing
+its history. It retains its posture-adapting detector, firmware settling gate,
+atomic save helper, reconnect behavior and diagnostic CLI, while adding explicit
+MPU identity/calibration, packet compatibility, deduplication and total deadlines.
