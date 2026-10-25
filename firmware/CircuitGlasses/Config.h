@@ -3,7 +3,7 @@
 #define VERITY_USE_ESPNOW_IMU 1
 #endif
 #define VERITY_ESPNOW_CHANNEL 1
-static const uint8_t VERITY_SENSOR_MAC[6]={0,0,0,0,0,0}; // sensor STA MAC
+static const uint8_t VERITY_SENSOR_MAC[6]={0x20,0x50,0x0D,0x1A,0x5C,0x8C}; // sensor STA MAC
 // Only used with VERITY_USE_ESPNOW_IMU=0; original direct MPU wiring, no SD card.
 #ifndef VERITY_IMU_SDA
 #define VERITY_IMU_SDA 13
