@@ -3,6 +3,10 @@
 Hands-free electronics assembly guidance: double nod to activate, ask a question or
 request a visual check, and hear a short response through a headset.
 
+![Verity smart-glasses prototype with attached camera and sensor hardware](assets/verity-prototype.png)
+
+*Verity hardware prototype assembled during the hackathon.*
+
 All four software components are implemented and integrated on **`main`**: device/IMU, voice, build agents and controller.
 The software scenario and hosted speech/vision path have been tested. Firmware
 builds successfully for AI Thinker ESP32-CAM using Arduino-ESP32 3.3.3 and
