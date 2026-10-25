@@ -2,11 +2,13 @@
 import asyncio
 from collections import deque
 import io
+import logging
 import math
 import time
 import wave
 import numpy as np
 
+log = logging.getLogger('verity.audio')
 
 def wav_bytes(pcm, rate=16000):
     output = io.BytesIO()
@@ -43,9 +45,18 @@ class Utterance:
         return wav_bytes(np.concatenate(self.frames), self.rate)
 
 
+def noise_threshold(wav):
+    """Speech threshold from a room-noise sample: 3x its RMS, clamped to a sane range."""
+    with wave.open(io.BytesIO(wav), 'rb') as source:
+        pcm = np.frombuffer(source.readframes(source.getnframes()), dtype='<i2')
+    rms = float(np.sqrt(np.mean((pcm.astype(np.float32)/32768)**2))) if len(pcm) else 0.0
+    return min(max(3*rms, 0.01), 0.1)
+
+
 class SoundDeviceIO:
     def __init__(self, *, input_device=None, output_device=None, threshold=0.015, silence=.8):
-        if not math.isfinite(threshold) or not 0 < threshold <= 1:
+        """threshold=None calibrates from one second of room noise in start()."""
+        if threshold is not None and (not math.isfinite(threshold) or not 0 < threshold <= 1):
             raise ValueError("threshold must be in (0, 1]")
         if not math.isfinite(silence) or not .1 <= silence <= 3:
             raise ValueError("silence must be between 0.1 and 3 seconds")
@@ -57,6 +68,10 @@ class SoundDeviceIO:
 
     async def start(self):
         await asyncio.to_thread(self._check_settings)
+        if self.threshold is None:
+            # ponytail: one-shot calibration; recalibrate per activation if venue noise changes mid-session
+            self.threshold = noise_threshold(await self.record(1, detect_silence=False))
+            log.info('calibrated VAD threshold=%.4f', self.threshold)
 
     def _check_settings(self):
         import sounddevice as sd

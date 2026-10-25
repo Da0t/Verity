@@ -121,10 +121,13 @@ async def run(args):
         for step in recipe['steps']:
             if step.get('reference_image'):
                 references[(recipe['recipe_id'],step['id'])]=(Path(args.recipe).parent/step['reference_image']).resolve()
-        device=Device(address=args.address)
+        if args.keyboard:
+            from verity.mocks import KeyboardDevice
+            device=KeyboardDevice(args.photo)
+        else: device=Device(address=args.address)
         voice=Voice(input_device=args.input_device,output_device=args.output_device,threshold=args.vad_threshold)
         coach=Coach(references=references)
-    controller=Session(device,voice,coach,recipe,cooldown=0 if args.mock else 0.35)
+    controller=Session(device,voice,coach,recipe,cooldown=0 if args.mock else 0.35,log_dir=args.log_dir or None)
     if args.mock:
         scenario=json.loads(Path(args.scenario).read_text()) if args.scenario else [
             'what is the next step','check this','why use a resistor','repeat','next','stop']
@@ -148,6 +151,13 @@ async def run(args):
         await controller.run()
 
 
+def vad_threshold(value):
+    if value=='auto': return None
+    value=float(value)
+    if not 0 < value < 1: raise argparse.ArgumentTypeError('VAD threshold must be between zero and one, or auto')
+    return value
+
+
 def device_id(value):
     return int(value) if value.isdecimal() else value
 
@@ -157,10 +167,13 @@ def main():
     parser.add_argument('--recipe',default='recipes/demo.json')
     parser.add_argument('--mock',action='store_true')
     parser.add_argument('--scenario',help='Mock-only JSON list of questions')
+    parser.add_argument('--keyboard',action='store_true',help='No glasses: Enter/n/b/q replace head gestures; real mic, model and speech')
+    parser.add_argument('--photo',help='Keyboard mode: JPEG returned for "check this"')
     parser.add_argument('--address',help='BLE device address or peripheral UUID')
     parser.add_argument('--input-device',type=device_id)
     parser.add_argument('--output-device',type=device_id)
-    parser.add_argument('--vad-threshold',type=float,default=0.015)
+    parser.add_argument('--vad-threshold',type=vad_threshold,default=None,help='Speech RMS threshold (0..1); default auto-calibrates from room noise')
+    parser.add_argument('--log-dir',default='runs',help='Per-session turn log and photos; empty string disables')
     parser.add_argument('--allow-template',action='store_true',help='Allow generic recipe for diagnostics; not a verified circuit')
     parser.add_argument('--audio-check',action='store_true')
     parser.add_argument('--voice-only',action='store_true',help='Microphone to AI to speaker, without ESP32 hardware')
@@ -168,7 +181,6 @@ def main():
                         help='Fixed JPEG shown to the AI with every voice-only question')
     parser.add_argument('--list-audio-devices',action='store_true')
     args=parser.parse_args()
-    if not 0 < args.vad_threshold < 1: parser.error('VAD threshold must be between zero and one')
     logging.basicConfig(level=logging.INFO,format='%(name)s: %(message)s')
     logging.getLogger('httpx').setLevel(logging.WARNING)
     try: asyncio.run(run(args))

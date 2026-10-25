@@ -33,7 +33,7 @@ requires bench validation before the demo.
 
 ```text
 MPU-6050 → ESP32-WROOM ── ESP-NOW ──► ESP32-CAM ── BLE ──► Windows session controller
-Headset microphone ── Gemini transcription ──► build coach / inspection / docs
+Headset microphone ── Gemini transcription ──► inspection / debug coach / docs
                                                      │
 Headset ◄── local system TTS + cancellable playback ◄──┘
 ```
@@ -88,7 +88,10 @@ no BLE hardware, microphone or API key after dependencies are installed.
    ```
 
    Use `--input-device ID --output-device ID` to select the headset.
-   `--vad-threshold 0.015` controls the recording energy threshold; tune for the room.
+   The recording threshold auto-calibrates from one second of room noise at startup
+   (stay quiet); `--vad-threshold 0.015` fixes it instead.
+   Each session logs turns and photos to `runs/<timestamp>/` and prints Q/A to the
+   console for onlookers; `--log-dir ""` disables the log.
 
 To test microphone → AI → spoken reply without either ESP32, run:
 
@@ -109,6 +112,10 @@ hands-free app. Failed captures do not overwrite an older image.
 
 ## Supply the actual circuit and run
 
+The recipe is what Verity debugs against: each step's expected connections are
+the ground truth for “check this”. For pure debugging, a single step describing
+the finished circuit is enough; for guided builds, list every step.
+
 `recipes/demo.json` is a **generic template**, not an approved circuit. Copy it,
 replace all steps/expected connections with your verified build, and set
 `template` to false. Add optional `reference_image` paths to steps, relative to
@@ -127,9 +134,11 @@ in [AGENTS_SETUP.md](docs/AGENTS_SETUP.md).
 ## Hands-free behavior
 
 * Double nod (down and back, twice) → listening tone → ask one question.
-* Double right head turn → next step; double left → previous step. Both read the
-  step aloud without listening. A single nod or turn does nothing.
-* “Check this” requests a fresh photo and a pass / issue / unclear observation.
+* **Debug:** “Check this” takes a fresh photo and returns pass / issue / unclear
+  with the visible evidence. Follow up with questions like “why isn't the LED on?”
+  or “what's wrong with this wiring?”.
+* **Guide:** double right head turn → next step; double left → previous step. Both
+  read the step aloud without listening. A single nod or turn does nothing.
 * “What is the next step?” reads the current instruction. “Next” / “back” manually
   move steps; they do not claim the prior step was verified.
 * “Repeat” replays the previous answer without a model request.
