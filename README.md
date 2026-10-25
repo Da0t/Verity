@@ -1,7 +1,19 @@
 # Verity
 
-Hands-free electronics assembly guidance: double nod to activate, ask a question or
-request a visual check, and hear a short response through a headset.
+**A hands-free AI debugger for hardware.**
+
+Software has debuggers. Your workbench should too.
+
+When software breaks, you get error messages and stack traces. When a circuit
+doesn't work, you have to trace physical connections, compare diagrams, and
+figure out what went wrong while both hands are busy.
+
+Verity brings debugging into your field of view. Its wearable camera gives an AI
+assistant a fresh view of your build, so you can ask questions, check visible
+connections against the current instructions, and hear what to inspect or fix.
+
+Double nod, ask “what's wrong here?”, and get spoken guidance without putting
+down your tools or opening an app.
 
 ![Verity smart-glasses prototype with attached camera and sensor hardware](assets/verity-prototype.png)
 
