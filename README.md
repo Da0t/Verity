@@ -90,6 +90,19 @@ no BLE hardware, microphone or API key after dependencies are installed.
    Use `--input-device ID --output-device ID` to select the headset.
    `--vad-threshold 0.015` controls the recording energy threshold; tune for the room.
 
+To test microphone → AI → spoken reply without either ESP32, run:
+
+```powershell
+$env:VERITY_STT_MODEL = 'gemini-3.5-flash-lite'
+.\.venv\Scripts\python.exe -m verity.app --voice-only --input-device INPUT_ID --output-device OUTPUT_ID
+```
+
+Choose current IDs from `--list-audio-devices`; they can change when Bluetooth
+devices connect. Press Enter to speak and `q` to quit. This mode sends
+`assets/voice-reference.jpg` with every question as a **fixed reference photo**.
+It does not observe the live assembly. Pass `--reference-image path/to/photo.jpg`
+to use another JPEG.
+
 For a camera-only diagnostic, `python receiver.py --interactive` saves verified
 JPEGs and prints transfer latency. This keyboard diagnostic is separate from the
 hands-free app. Failed captures do not overwrite an older image.

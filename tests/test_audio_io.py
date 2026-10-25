@@ -64,3 +64,22 @@ class AudioIOTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(calls[0]['samplerate'],48000)
         self.assertEqual(calls[0]['channels'],2)
         self.assertEqual(calls[-2:],['abort','close'])
+
+    async def test_playback_survives_transient_output_underflow(self):
+        class Stop(Exception): pass
+        class Status:
+            output_underflow = True
+            def __bool__(self): return True
+        class Output:
+            def __init__(self, **options): self.options = options
+            def start(self):
+                try:
+                    self.options['callback'](np.empty((1024,1), dtype=np.float32),
+                                             1024, None, Status())
+                except Stop:
+                    self.options['finished_callback']()
+            def abort(self): pass
+            def close(self): pass
+        fake = SimpleNamespace(OutputStream=Output, CallbackStop=Stop)
+        with patch.dict(sys.modules, {'sounddevice': fake}):
+            await SoundDeviceIO().play(wav_bytes(np.ones(320, dtype=np.int16)))

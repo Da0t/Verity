@@ -126,7 +126,10 @@ class SoundDeviceIO:
         offset = 0; loop = asyncio.get_running_loop(); done = asyncio.Event()
         def callback(outdata, frames, timing, status):
             nonlocal offset, failed
-            failed = failed or bool(status)
+            # PortAudio can report a brief output underflow when a device starts,
+            # especially for the 100 ms listening cue. Keep feeding samples;
+            # a transient underflow should not abort the entire voice turn.
+            failed = failed or bool(status and not status.output_underflow)
             count=min(frames, len(samples)-offset); outdata.fill(0)
             if count: outdata[:count] = samples[offset:offset+count]
             offset += count
