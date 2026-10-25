@@ -112,7 +112,10 @@ static void begin() {
   publish(); service->start();
   auto* ad = NimBLEDevice::getAdvertising();
   ad->addServiceUUID(SERVICE); ad->setName("CircuitGlasses");
-  ad->enableScanResponse(true); ad->start();
+  ad->enableScanResponse(true);
+  const bool advertising = ad->start();
+  Serial.printf("BLE advertising %s; address %s\n", advertising ? "started" : "failed",
+                NimBLEDevice::getAddress().toString().c_str());
 }
 // Notify subscribers of one head gesture: payload is seq:u32 little-endian,
 // then gesture:u8 (Verity::Gesture: 1=double nod, 2=double left, 3=double right).

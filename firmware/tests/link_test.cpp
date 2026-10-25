@@ -53,7 +53,9 @@ int main() {
     fired=0; move(d,t,0,35); move(d,t,0,35); hold(d,t,0,0,2000); assert(fired==DoubleLeft);
     fired=0; move(d,t,0,-35); move(d,t,0,-35); hold(d,t,0,0,2000); assert(fired==DoubleRight);
     fired=0; move(d,t,0,35); move(d,t,0,-35); hold(d,t,0,0,2000); assert(fired==0);
-    move(d,t,25,0); hold(d,t,0,0,1000); move(d,t,25,0); hold(d,t,0,0,2000); assert(fired==0);
+    move(d,t,25,0); hold(d,t,0,0,1600); move(d,t,25,0); hold(d,t,0,0,2000); assert(fired==0);
+    move(d,t,0,35); move(d,t,25,0); move(d,t,0,35); hold(d,t,0,0,2000); assert(fired==DoubleLeft); // stray nod mid-pair
+    fired=0;
     move(d,t,25,0); move(d,t,25,0); move(d,t,25,0); hold(d,t,0,0,2000); assert(fired==DoubleNod);
     fired=0; move(d,t,10,10); move(d,t,10,10); hold(d,t,0,0,2000); assert(fired==0); // too small
   }
