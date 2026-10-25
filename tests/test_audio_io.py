@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import Mock, patch
 import wave
 import numpy as np
-from verity.audio.io import SoundDeviceIO, wav_bytes
+from verity.audio.io import SoundDeviceIO, noise_threshold, wav_bytes
 
 
 class AudioIOTests(unittest.IsolatedAsyncioTestCase):
@@ -64,3 +64,14 @@ class AudioIOTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(calls[0]['samplerate'],48000)
         self.assertEqual(calls[0]['channels'],2)
         self.assertEqual(calls[-2:],['abort','close'])
+
+    async def test_auto_threshold_calibrates_from_room_noise(self):
+        self.assertEqual(noise_threshold(wav_bytes(np.zeros(1600,dtype=np.int16))),0.01)
+        self.assertEqual(noise_threshold(wav_bytes(np.full(1600,30000,dtype=np.int16))),0.1)
+        audio=SoundDeviceIO(threshold=None); audio._check_settings=lambda: None
+        async def noise(timeout, detect_silence=True):
+            self.assertFalse(detect_silence)
+            return wav_bytes(np.full(1600,1000,dtype=np.int16))
+        audio.record=noise
+        await audio.start()
+        self.assertAlmostEqual(audio.threshold,3*1000/32768,places=4)

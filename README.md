@@ -1,7 +1,12 @@
 # Verity
 
-Hands-free electronics assembly guidance: double nod to activate, ask a question or
-request a visual check, and hear a short response through a headset.
+Hands-free hardware debugger for electronics on the bench. Double nod, say “check
+this”, and Verity photographs your board, compares it to the expected connections
+and tells you through a headset whether it passes, what looks wrong, or that it
+can't tell. Ask follow-up questions about the fault without putting down your tools.
+
+It can also guide a build: load a step-by-step recipe and Verity reads each step
+aloud, moves forward and back on head turns, and checks your work as you go.
 
 All four software components are implemented and integrated on **`main`**: device/IMU, voice, build agents and controller.
 The software scenario and hosted speech/vision path have been tested. Firmware
@@ -17,7 +22,7 @@ requires bench validation before the demo.
 
 ```text
 MPU-6050 → ESP32-WROOM ── ESP-NOW ──► ESP32-CAM ── BLE ──► Windows session controller
-Headset microphone ── Gemini transcription ──► build coach / inspection / docs
+Headset microphone ── Gemini transcription ──► inspection / debug coach / docs
                                                      │
 Headset ◄── local system TTS + cancellable playback ◄──┘
 ```
@@ -72,13 +77,20 @@ no BLE hardware, microphone or API key after dependencies are installed.
    ```
 
    Use `--input-device ID --output-device ID` to select the headset.
-   `--vad-threshold 0.015` controls the recording energy threshold; tune for the room.
+   The recording threshold auto-calibrates from one second of room noise at startup
+   (stay quiet); `--vad-threshold 0.015` fixes it instead.
+   Each session logs turns and photos to `runs/<timestamp>/` and prints Q/A to the
+   console for onlookers; `--log-dir ""` disables the log.
 
 For a camera-only diagnostic, `python receiver.py --interactive` saves verified
 JPEGs and prints transfer latency. This keyboard diagnostic is separate from the
 hands-free app. Failed captures do not overwrite an older image.
 
 ## Supply the actual circuit and run
+
+The recipe is what Verity debugs against: each step's expected connections are
+the ground truth for “check this”. For pure debugging, a single step describing
+the finished circuit is enough; for guided builds, list every step.
 
 `recipes/demo.json` is a **generic template**, not an approved circuit. Copy it,
 replace all steps/expected connections with your verified build, and set
@@ -98,9 +110,11 @@ in [AGENTS_SETUP.md](docs/AGENTS_SETUP.md).
 ## Hands-free behavior
 
 * Double nod (down and back, twice) → listening tone → ask one question.
-* Double right head turn → next step; double left → previous step. Both read the
-  step aloud without listening. A single nod or turn does nothing.
-* “Check this” requests a fresh photo and a pass / issue / unclear observation.
+* **Debug:** “Check this” takes a fresh photo and returns pass / issue / unclear
+  with the visible evidence. Follow up with questions like “why isn't the LED on?”
+  or “what's wrong with this wiring?”.
+* **Guide:** double right head turn → next step; double left → previous step. Both
+  read the step aloud without listening. A single nod or turn does nothing.
 * “What is the next step?” reads the current instruction. “Next” / “back” manually
   move steps; they do not claim the prior step was verified.
 * “Repeat” replays the previous answer without a model request.

@@ -1,8 +1,10 @@
 """One-turn-at-a-time session controller for head gestures, voice, camera and coach."""
 import asyncio
 import copy
+import json
 import logging
 import time
+from pathlib import Path
 from verity.agents.coach import snapshot
 from verity.agents.models import Result, result
 
@@ -10,7 +12,7 @@ log = logging.getLogger('verity.session')
 
 
 class Session:
-    def __init__(self, device, voice, coach, recipe, *, turn_timeout=60, cooldown=0.35):
+    def __init__(self, device, voice, coach, recipe, *, turn_timeout=60, cooldown=0.35, log_dir=None):
         self.device=device; self.voice=voice; self.coach=coach
         self.data=snapshot({**recipe, 'step_index':0, 'history':[]})
         self.data['last_observation']=None
@@ -19,6 +21,22 @@ class Session:
         self.turn_id=0; self.task=None; self.stop=asyncio.Event()
         self.idle=asyncio.Event(); self.idle.set()
         self.turn_started=asyncio.Event()
+        self.log_dir=None
+        if log_dir:
+            self.log_dir=Path(log_dir)/time.strftime('%Y%m%d-%H%M%S')
+            self.log_dir.mkdir(parents=True,exist_ok=True)
+            log.info('logging turns to %s',self.log_dir)
+
+    def record(self, entry):
+        """Append one turn to turns.jsonl; logging never breaks a turn."""
+        if not self.log_dir: return
+        try:
+            with open(self.log_dir/'turns.jsonl','a',encoding='utf-8') as file:
+                file.write(json.dumps(entry)+'\n')
+        except OSError as exc: log.error('turn log failed: %s',type(exc).__name__)
+
+    def step_speech(self, index):
+        return f"Step {index+1} of {len(self.data['steps'])}. {self.data['steps'][index]['instruction']}"[:600]
 
     def transition(self, state):
         self.state=state
@@ -79,23 +97,23 @@ class Session:
         if normalized in ('repeat','say that again'):
             return result(self.last_answer or 'There is no previous answer to repeat.',intent='repeat')
         if normalized in ('what next','what is the next step',"what's next",'what should i do','current step'):
-            return result(self.data['steps'][self.data['step_index']]['instruction'][:600],intent='question')
+            return result(self.step_speech(self.data['step_index']),intent='question')
         if normalized in ('next','next step'):
             index=self.data['step_index']+1
             if index >= len(self.data['steps']): return result('You are on the last step.',intent='next')
-            output=result(self.data['steps'][index]['instruction'][:600],intent='next')
+            output=result(self.step_speech(index),intent='next')
             output['suggested_step_index']=index
             return output
         if normalized in ('back','go back','previous','previous step'):
             index=self.data['step_index']-1
             if index < 0: return result('You are on the first step.',intent='back')
-            output=result(self.data['steps'][index]['instruction'][:600],intent='back')
+            output=result(self.step_speech(index),intent='back')
             output['suggested_step_index']=index
             return output
         return None
 
     async def _turn(self, serial, question=None):
-        captured=False
+        captured=False; started=time.monotonic()
         async def capture():
             nonlocal captured
             if serial != self.turn_id: raise asyncio.CancelledError
@@ -104,6 +122,9 @@ class Session:
                 image=await self.device.capture_jpeg()
                 if serial != self.turn_id: raise asyncio.CancelledError
                 captured=True
+                if self.log_dir:
+                    try: (self.log_dir/f'turn-{serial}.jpg').write_bytes(image)
+                    except OSError as exc: log.error('photo log failed: %s',type(exc).__name__)
                 return image
             finally:
                 if serial==self.turn_id: self.transition('THINKING')
@@ -130,11 +151,19 @@ class Session:
                     raise ValueError('Invalid step change')
                 if validated['verdict'] in ('pass','issue') and not captured:
                     raise ValueError('Visual result without capture')
+                speech=validated['speech']
+                if validated['verdict']=='pass' and self.data['step_index']+1 < len(self.data['steps']):
+                    speech+=' Turn right twice for the next step.'
                 self.transition('SPEAKING')
-                await self.voice.speak(validated['speech'])
+                await self.voice.speak(speech)
                 if serial != self.turn_id: return
                 if next_index is not None: self.data['step_index']=next_index
-                self.last_answer=validated['speech']
+                self.last_answer=speech
+                print(f"Q: {question}\nA: {speech} [{validated['verdict']}]",flush=True)
+                self.record({'turn':serial,'question':question,'speech':speech,'intent':validated['intent'],
+                             'verdict':validated['verdict'],'evidence':validated['evidence'],
+                             'sources':validated['sources'],'step_index':self.data['step_index'],
+                             'captured':captured,'elapsed_ms':round((time.monotonic()-started)*1000)})
                 self.data['history']=(self.data['history']+[
                     {'role':'user','text':question}, {'role':'assistant','text':self.last_answer}])[-8:]
                 if validated['verdict']!='not_checked': self.data['last_observation']=validated
@@ -142,6 +171,8 @@ class Session:
             raise
         except Exception as exc:
             log.warning('turn failed: %s',type(exc).__name__)
+            self.record({'turn':serial,'question':question,'error':type(exc).__name__,'captured':captured,
+                         'elapsed_ms':round((time.monotonic()-started)*1000)})
             if serial==self.turn_id:
                 self.transition('SPEAKING')
                 try:

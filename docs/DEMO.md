@@ -43,6 +43,15 @@ is `python -m verity.app`; component contracts remain in docs/CONTRACTS.md.
 .\.venv\Scripts\python.exe -m verity.app --recipe recipes/your-circuit.json
 ```
 
+Without the glasses, `--keyboard` runs the real microphone, transcription, coach
+and speech with keys replacing gestures (Enter = double nod, n/b = next/back,
+q = quit). `--photo bench.jpg` answers "check this" with that file; it is not a
+fresh camera view, so it tests the pipeline, not live inspection.
+
+```powershell
+.\.venv\Scripts\python.exe -m verity.app --keyboard --allow-template --photo bench.jpg
+```
+
 The app refuses the template in live mode unless --allow-template is explicitly
 provided. This permits diagnostics but does not establish recipe correctness.
 

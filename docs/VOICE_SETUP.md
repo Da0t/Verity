@@ -26,8 +26,9 @@ and microphone input. No browser Web Bluetooth or browser microphone is needed.
 For macOS development, system synthesis uses say + afconvert. Linux requires an
 injected synthesizer; the standard integrated CLI currently targets Windows/macOS.
 
-The default energy threshold is 0.015 full-scale RMS. --vad-threshold tunes it for
-the actual microphone/room. Speech must exceed 120ms; recording ends after 800ms
+The app calibrates the energy threshold at startup from one second of room noise
+(3x noise RMS, clamped to 0.01–0.1); stay quiet while it starts. --vad-threshold 0.015
+fixes it instead. Speech must exceed 120ms; recording ends after 800ms
 of silence or a 10-second hard cap. Silence skips the hosted API. This is simple
 energy detection: a loud room may need a closer boom mic and tuning.
 
